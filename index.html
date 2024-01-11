@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+	<!-- web app settings -->
+	<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1.5, user-scalable=1">
+	<!-- Title, icons and colors -->
+	<title>Bytemind GitHub</title>
+	<meta name="application-name" content="Bytemind GitHub"/>
+	<meta name="apple-mobile-web-app-title" content="Bytemind GitHub">
+	<meta name="description" content="Bytemind frontpage for GitHub projects">
+	<meta name="theme-color" content="#000">
+	<!-- Icons -->
+	<link rel="icon" sizes="512x512" href="img/icon.png">
+	<link rel="apple-touch-icon" href="img/icon.png">
+	<meta property="og:image" content="img/icon.png"/>
+	<!-- imports -->
+	<script type="text/javascript" src="js/clock.js" charset="UTF-8" defer></script>
+	<style>
+	* {
+	  box-sizing: border-box;
+	  font-family: sans-serif;
+	}
+	html, body {
+		background: #111;
+		color: #ddd;
+		height: 100%;
+		width: 100%;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		flex-direction: column;
+	}
+	section {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		padding: 16px;
+	}
+	a, a:visited {
+		color: currentColor;
+		text-decoration: none;
+	}
+	.fp-text-box {
+		font-size: 22px;
+		border: 1px solid #999;
+		border-radius: 6px;
+		padding: 8px;
+	}
+	.glow-box .outer {
+		position: relative;
+		box-sizing: border-box;
+		padding: 15px;
+		height: 200px;
+		width: 200px;
+		box-shadow: 0px 0px 13px 15px #111 inset;
+		background: linear-gradient(to right, rgba(250,50,50, 0.5), rgba(50,150,250, 0.5));
+		padding: 0;
+		border-radius: 50%;
+		outline: 6px solid #111;
+		outline-offset: -3px;
+	}
+	.glow-box .inner {
+		position: absolute;
+		top: 20px;
+		left: 20px;
+		width: calc(100% - 40px);
+		height: calc(100% - 40px);
+		background: linear-gradient(to right, rgb(250,50,50), rgb(50,150,250));
+		padding: 0;
+		border-radius: 50%;
+	}
+	.glow-box .content {
+		position: absolute;
+		top: 5px;
+		left: 5px;
+		width: calc(100% - 10px);
+		height: calc(100% - 10px);
+		background: #111;
+		color: #fff;
+		padding: 16px;
+		border-radius: 50%;
+	}
+	</style>
+	<link rel="stylesheet" href="css/clock.css">
+</head>
+<body>
+	<section>
+		<a style="display: flex; border: 1px solid #999; border-radius: 6px;" href="http://bytemind.de" title="bytemind.de homepage">
+			<svg style="width:162px; height:44px; padding:5px 0;font-size: 24px;"><text style="fill: url(#bytemind-color-gradient);" y="25px" x="16px">bytemind.de</text></svg>
+		</a>
+	</section>
+	<section>
+		<div class="glow-box">
+			<div class="outer">
+				<div class="inner">
+					<div class="content">
+						<div id="clock-container" class="clock">
+							<div class="tick top"></div>
+							<div class="tick right"></div>
+							<div class="tick bottom"></div>
+							<div class="tick left"></div>
+							<div class="center"></div>
+							<!--<div class="shadow"></div>-->
+							<div id="clock-hour" class="hour"></div>
+							<div id="clock-minute" class="minute"></div>
+							<div id="clock-second" class="second"></div>
+							<div class="digital-box">
+								<div id="clock-date" class="date"></div>
+								<div id="clock-digital" class="digital"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+	<section>
+		<div class="fp-text-box"><a href="https://github.com/bytemind-de/bytemind-de.github.io" title="bytemind-de on GitHub">GitHub Projects</a></div>
+	</section>
+	<!-- Some data definitions -->	
+	<div style="width: 0; height: 0; overflow: hidden;">
+		<svg><defs><linearGradient id="bytemind-color-gradient">
+			<stop offset=".07" stop-color="rgb(250,50,50)" />
+			<stop offset=".93" stop-color="rgb(50,150,250)" />
+		</linearGradient></defs></svg>
+	</div>
+</body>
+</html>
