@@ -55,6 +55,12 @@ html.dark .main-header {
 	margin: 0;
 	cursor: pointer;
 }
+#d4-icon {
+	color: #000;
+}
+html.dark #d4-icon {
+	color: #EBE9E8;
+}
 .options-menu {
 	position: absolute;
 	top: 0;
@@ -188,6 +194,20 @@ input[type=submit],
 	flex: 0 0 auto !important;
 	cursor: pointer;
 }
+button.bigger, 
+input[type=submit].bigger,
+.button-style.bigger {
+	min-height: 24px;
+}
+button.big, 
+input[type=submit].big,
+.button-style.big {
+	font-size: 13px;
+	min-height: 28px;
+}
+a.button-style {
+	text-decoration: none;
+}
 html.dark button,
 html.dark input[type=submit],
 html.dark .button-style {
@@ -208,8 +228,8 @@ button + .button-style,
 .button-style + button {
 	margin-left: 4px !important;
 }
-.damage-item button,
-.damage-item .button-style	{
+.calc-item button,
+.calc-item .button-style	{
 	margin-left: 2px !important;
 	font-size: 11px;
 }
@@ -316,25 +336,25 @@ html.dark .section.info-box {
 .group.border {
 	border-bottom: 1px solid currentColor;
 }
-.group.damage-item {
+.group.calc-item {
 	flex-wrap: nowrap;
 }
-.group.damage-item.hidden {
+.group.calc-item.hidden {
 	opacity: 0.33;
 }
-.group.damage-item.bm-dragging {
+.group.calc-item.bm-dragging {
 	background: rgba(128, 128, 128, 0.15);
 }
-/*.group.damage-item.bm-drag-target {
+/*.group.calc-item.bm-drag-target {
 	border-top: 1px dashed currentColor;
 }*/
-.group.damage-item.bm-drag-target.bm-drag-pos-top {
+.group.calc-item.bm-drag-target.bm-drag-pos-top {
 	border-top: 1px dashed currentColor;
 }
-.group.damage-item.bm-drag-target.bm-drag-pos-bottom {
+.group.calc-item.bm-drag-target.bm-drag-pos-bottom {
 	border-bottom: 1px dashed currentColor;
 }
-.group.damage-item.bm-drag-target > * {
+.group.calc-item.bm-drag-target > * {
 	pointer-events: none;
 }
 .group.buttons-box button,
@@ -344,6 +364,9 @@ html.dark .section.info-box {
 .group label {
 	margin: 4px 8px 4px 0;
 	flex: 1 1 auto;
+}
+.group label.single {
+	margin: 4px;
 }
 .group.limit-label label {
 	max-width: calc(100% - 136px);
@@ -387,6 +410,15 @@ html.dark input.highlight {
 .group input.highlight.border-col-overp {
 	border-color: #00deed;
 }
+.group input.highlight.border-col-life {
+	border-color: #b71814;
+}
+.group input.highlight.border-col-armor {
+	border-color: #008bc1;
+}
+.group input.highlight.border-col-elemental-resis {
+	border-color: #009688;
+}
 .group input.highlight.add-mod-val {
 	border-color: #009688;
 }
@@ -396,7 +428,7 @@ html.dark input.highlight {
 .group input.highlight.reduction-mod-val {
 	border-color: #aaa;
 }
-.group.damage-item.hidden {
+.group.calc-item.hidden {
 	opacity: 0.33;
 }
 .color-base {
@@ -428,6 +460,24 @@ html.dark input.highlight {
 }
 .color-reduction-mod-light {
 	color: #ccc;
+}
+.color-life {
+	color: #b71814;
+}
+.color-life-alt {
+	color: #8e201d;
+}
+.color-armor {
+	color: #008bc1;
+}
+.color-armor-alt {
+	color: #046084;
+}
+.color-elemental-resis {
+	color: #009688;
+}
+.color-elemental-resis-alt {
+	color: #4caf50;
 }
 .modifiers-container {
 	display: flex;
@@ -493,7 +543,7 @@ html.dark .pop-up-message-box {
 }
 .pop-up-message-box-close,
 .section-vis-button {
-	background-image: url('close-button-light.svg') !important;
+	background-image: url('img/ui/close-button-light.svg') !important;
 	background-size: contain !important;
 	background-position: center !important;
 	background-repeat: no-repeat !important;
