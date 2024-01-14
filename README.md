@@ -1,3 +1,5 @@
 # Bytemind Github page
 
-Here you'll find an overview of Bytemind GitHub projects.
+Here you'll soon find an overview of Bytemind GitHub projects.  
+  
+Projects page: https://github.com/bytemind-de
