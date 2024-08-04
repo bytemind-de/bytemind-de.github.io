@@ -8,6 +8,16 @@ var penaltyModColor = "color-penalty-mod";
 var penaltyModColorLight = "color-penalty-mod-light";
 var elementalResisColor = "color-elemental-resis";
 var elementalResisColorAlt = "color-elemental-resis-alt";
+
+var classSpecificValues = {
+	"Barb": {},
+	"Druid": {},
+	"Necro": {},
+	"Rogue": {},
+	"Sorc": {},
+	"Spiritborn": {}
+}
+var getCharClass = function(){ return ""; };	//NOTE: set inside 'buildCalculator'
 	
 function buildCalculator(containerEle, options){
 	var Calculator = {
@@ -16,11 +26,19 @@ function buildCalculator(containerEle, options){
 		restoreData: restoreData,
 		getData: getData
 	};
+	
+	var charClassEle = containerEle.querySelector("[name=char-class]");
+	charClassEle?.addEventListener("change", function(){
+		disableCalculationBox();
+	});
+	getCharClass = function(){ return charClassEle?.value || ""; };
 
 	var baseLifeEle = containerEle.querySelector("[name=char-base-life]");
 	var strengthEle = containerEle.querySelector("[name=char-strength]");
 	var elementalResisEle = containerEle.querySelector("[name=elemental-resis-custom]");
 	var isFortified = containerEle.querySelector("[name=char-is-fortified]");
+	isFortified.addEventListener("click", function(){
+		disableCalculationBox(); });
 	
 	var armorItemsContainer = containerEle.querySelector("[name=armor-items-container]");
 	var armorItemsBtn = containerEle.querySelector("[name=armor-items-btn]");
@@ -74,34 +92,92 @@ function buildCalculator(containerEle, options){
 	}
 	
 	function addArmorItem(newName, startValue, isDisabled, selectedTypes){
-		var modName = newName || prompt("Enter a name for this value:");
-		if (!modName) return;
-		addDynamicMod(armorItemsContainer, modName, "border-col-armor", startValue, isDisabled, 1.0, undefined, selectedTypes);
+		//var modName = newName || prompt("Enter a name for this value:");
+		//if (!modName) return;
+		//addDynamicMod(armorItemsContainer, modName, "border-col-armor", startValue, isDisabled, 1.0, undefined, selectedTypes, flatArmorLabelsList, onModUpdate);
+		Promise.resolve(newName? {name: newName} : addDynamicModPromptPromise("", "Enter a name for this value:",
+			flatArmorLabelsList, undefined, selectedTypes))
+		.then(function(data){
+			var modName = data.name;
+			if (modName){
+				addDynamicMod(armorItemsContainer, modName, "border-col-armor", startValue, isDisabled, 1.0,
+					undefined, selectedTypes || data.entry?.types, flatArmorLabelsList, onModUpdate);
+			}
+		});
 	}
 	function addArmorPctValue(newName, startValue, isDisabled, selectedTypes){
-		var modName = newName || prompt("Enter a name for this '%' modifier:");
-		if (!modName) return;
-		addDynamicMod(armorPctContainer, modName, "border-col-armor", startValue, isDisabled, 0.1, undefined, selectedTypes);
+		//var modName = newName || prompt("Enter a name for this '%' modifier:");
+		//if (!modName) return;
+		//addDynamicMod(armorPctContainer, modName, "border-col-armor", startValue, isDisabled, 0.1, undefined, selectedTypes, pctArmorLabelsList, onModUpdate);
+		Promise.resolve(newName? {name: newName} : addDynamicModPromptPromise("", "Enter a name for this '%' modifier:",
+			pctArmorLabelsList, undefined, selectedTypes))
+		.then(function(data){
+			var modName = data.name;
+			if (modName){
+				addDynamicMod(armorPctContainer, modName, "border-col-armor", startValue, isDisabled, 1.0,
+					undefined, selectedTypes || data.entry?.types, pctArmorLabelsList, onModUpdate);
+			}
+		});
 	}
 	function addMaxlifeItem(newName, startValue, isDisabled, selectedTypes){
-		var modName = newName || prompt("Enter a name for this value:");
-		if (!modName) return;
-		addDynamicMod(maxlifeItemsContainer, modName, "border-col-life", startValue, isDisabled, 1.0, undefined, selectedTypes);
+		//var modName = newName || prompt("Enter a name for this value:");
+		//if (!modName) return;
+		//addDynamicMod(maxlifeItemsContainer, modName, "border-col-life", startValue, isDisabled, 1.0, undefined, selectedTypes, flatLifeLabelsList, onModUpdate);
+		Promise.resolve(newName? {name: newName} : addDynamicModPromptPromise("", "Enter a name for this value:",
+			flatLifeLabelsList, undefined, selectedTypes))
+		.then(function(data){
+			var modName = data.name;
+			if (modName){
+				addDynamicMod(maxlifeItemsContainer, modName, "border-col-life", startValue, isDisabled, 1.0,
+					undefined, selectedTypes || data.entry?.types, flatLifeLabelsList, onModUpdate);
+			}
+		});
 	}
 	function addMaxlifePctValue(newName, startValue, isDisabled, selectedTypes){
-		var modName = newName || prompt("Enter a name for this '%' modifier:");
-		if (!modName) return;
-		addDynamicMod(maxlifePctContainer, modName, "border-col-life", startValue, isDisabled, 0.1, undefined, selectedTypes);
+		//var modName = newName || prompt("Enter a name for this '%' modifier:");
+		//if (!modName) return;
+		//addDynamicMod(maxlifePctContainer, modName, "border-col-life", startValue, isDisabled, 0.1, undefined, selectedTypes, pctLifeLabelsList, onModUpdate);
+		Promise.resolve(newName? {name: newName} : addDynamicModPromptPromise("", "Enter a name for this '%' modifier:",
+			pctLifeLabelsList, undefined, selectedTypes))
+		.then(function(data){
+			var modName = data.name;
+			if (modName){
+				addDynamicMod(maxlifePctContainer, modName, "border-col-life", startValue, isDisabled, 1.0,
+					undefined, selectedTypes || data.entry?.types, pctLifeLabelsList, onModUpdate);
+			}
+		});
 	}
 	function addDrPctValue(newName, startValue, isDisabled, selectedTypes){
-		var modName = newName || prompt("Enter a name for this damage reduction modifier:");
-		if (!modName) return;
-		addDynamicMod(drValuesContainer, modName, "reduction-mod-val", startValue, isDisabled, 0.1, undefined, selectedTypes);
+		//var modName = newName || prompt("Enter a name for this damage reduction modifier:");
+		//if (!modName) return;
+		//addDynamicMod(drValuesContainer, modName, "reduction-mod-val", startValue, isDisabled, 0.1, undefined, selectedTypes, damageReductionLabelsList, onModUpdate);
+		Promise.resolve(newName? {name: newName} : addDynamicModPromptPromise("", "Enter a name for this damage reduction modifier:",
+			damageReductionLabelsList, undefined, selectedTypes))
+		.then(function(data){
+			var modName = data.name;
+			if (modName){
+				addDynamicMod(drValuesContainer, modName, "reduction-mod-val", startValue, isDisabled, 1.0,
+					undefined, selectedTypes || data.entry?.types, damageReductionLabelsList, onModUpdate);
+			}
+		});
 	}
 	function addPenaltyPctValue(newName, startValue, isDisabled, selectedTypes){
-		var modName = newName || prompt("Enter a name for this penalty modifier:");
-		if (!modName) return;
-		addDynamicMod(penaltyValuesContainer, modName, "penalty-mod-val", startValue, isDisabled, 0.1, undefined, selectedTypes);
+		//var modName = newName || prompt("Enter a name for this penalty modifier:");
+		//if (!modName) return;
+		//addDynamicMod(penaltyValuesContainer, modName, "penalty-mod-val", startValue, isDisabled, 0.1, undefined, selectedTypes, pctMoreDamageTakenLabelsList, onModUpdate);
+		Promise.resolve(newName? {name: newName} : addDynamicModPromptPromise("", "Enter a name for this penalty modifier:",
+			pctMoreDamageTakenLabelsList, undefined, selectedTypes))
+		.then(function(data){
+			var modName = data.name;
+			if (modName){
+				addDynamicMod(penaltyValuesContainer, modName, "penalty-mod-val", startValue, isDisabled, 1.0,
+					undefined, selectedTypes || data.entry?.types, pctMoreDamageTakenLabelsList, onModUpdate);
+			}
+		});
+	}
+	
+	function onModUpdate(data){
+		disableCalculationBox();
 	}
 	
 	function getArmorItems(includeHidden){
@@ -222,9 +298,21 @@ function buildCalculator(containerEle, options){
 		resultContainer.appendChild(div);
 	}
 	
-	function calculateDefense(){
+	function clearCalculation(){
 		resultContainer.innerHTML = "";
-		resultContainer.parentElement.style.removeProperty('display');
+		resultContainer.parentElement.style.display = "none";
+	}
+	function disableCalculationBox(){
+		resultContainer.parentElement.style.opacity = 0.50;
+	}
+	function enableCalculationBox(){
+		resultContainer.parentElement.style.removeProperty("display");
+		resultContainer.parentElement.style.removeProperty("opacity");
+	}
+	
+	function calculateDefense(){
+		clearCalculation();
+		enableCalculationBox();
 		
 		var data = getData();
 		
@@ -274,7 +362,7 @@ function buildCalculator(containerEle, options){
 				return (totalHp + addLife);
 			}
 		}, maximumLifeBase);
-		addResult("Total maximum life", maximumLifeMulti, undefined, lifeItemColor, "Total life after multiplicative modifiers.");
+		addResult("Total life + barrier", maximumLifeMulti, undefined, lifeItemColor, "Total max. life after multiplicative modifiers including barrier.");
 		addCustom("<hr>", "flat");
 		var maximumLife = maximumLifeMulti;
 		
@@ -357,6 +445,7 @@ function buildCalculator(containerEle, options){
 	function getData(){
 		var data = {
 			calculatorName: getTitle(),
+			charClass: getCharClass(),
 			baseLife: +baseLifeEle.value,
 			strength: +strengthEle.value || 1,
 			elementalResisSingle: +elementalResisEle.value || 0,
@@ -372,7 +461,9 @@ function buildCalculator(containerEle, options){
 		return data;
 	}
 	function restoreData(data, calculatorName){
-		resultContainer.innerHTML = "";
+		clearCalculation();
+		
+		if (charClassEle) charClassEle.value = data.charClass || "";
 		baseLifeEle.value = data.baseLife || 5000;
 		strengthEle.value = data.strength || 1;
 		elementalResisEle.value = data.elementalResisSingle || 0;
@@ -488,6 +579,8 @@ function buildCalculator(containerEle, options){
 	//Restore data?
 	if (options?.cfg){
 		restoreData(cfg.data, cfg.name);
+	}else{
+		clearCalculation();
 	}
 	//Add some DEMO values?
 	if (options?.addDemoContent){
@@ -603,22 +696,66 @@ noConImportDataSelector.addEventListener('change', function(ev){
 	const file = ev.target.files[0];
 	if (file){
 		importConfigurationFromFile(file, function(fileType, data){
-			if (fileType == "singleConfig"){
-				//create new calculator and add data
-				if (data){
-					var calc = addNewCalculator(false);
-					calc.restoreData(data);
-				}
-			}else if (fileType == "configArray"){
-				//add all configurations from file to storage
-				if (confirm("Warning: This will overwrite existing configurations with the same name! Continue?")){
-					var keepOld = true;
-					writeAllConfigsToLocalStorage(data, keepOld);
-				}
-			}
+			openCalculatorsFromData(fileType, data, false);
 		});
 	}
 });
+function openCalculatorsFromData(fileType, data, openList, calculatorNames){
+	if (fileType == "singleConfig"){
+		//create new calculator and add data
+		if (data){
+			var calc = addNewCalculator(false);
+			calc.restoreData(data);
+		}
+	}else if (fileType == "configArray"){
+		//open calculators or import?
+		if (openList){
+			//open calculators
+			if (!calculatorNames?.length){
+				//fill up with IDs
+				calculatorNames = Object.keys(data);
+			}
+			calculatorNames.forEach(calcIdOrName => {
+				var calcData = data[calcIdOrName];
+				if (!calcData){
+					calcData = Object.values(data).find(itm => itm?.name == calcIdOrName);
+				}
+				if (calcData?.calc == d4cType){
+					var calc = addNewCalculator(false);
+					calc.restoreData(calcData.data);
+				}
+			});
+		}else{
+			//add all configurations from file to storage
+			if (confirm("Warning: This will overwrite existing configurations with the same name! Continue?")){
+				var keepOld = true;
+				writeAllConfigsToLocalStorage(data, keepOld);
+			}
+		}
+	}
+}
 
-//Show a default calculator at start:
-//addNewCalculator(true, true);
+//Load calculators from file and or name?
+checkUrlFileLoad(function(fileType, data){
+	//on load
+	console.log("Got data from file:", fileType, data);
+	//what now?
+	let promptText = "A file with calculators has been loaded.\nDo you want to open/import the data?";
+	if (confirm(promptText) == true){
+		//OK
+		openCalculatorsFromData(fileType, data, false);
+	}
+	
+}, function(fileType, data, calculatorNames){
+	//on load and show selected
+	console.log("Got data from file:", fileType, data);
+	console.log("Show calculators:", calculatorNames);
+	openCalculatorsFromData(fileType, data, true, calculatorNames);
+	
+}, function(){
+	//on skip
+	console.log("Ready");
+	
+	//Show a default calculator at start:
+	//addNewCalculator(true, true);
+});
