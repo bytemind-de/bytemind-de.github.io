@@ -22,13 +22,14 @@ var selectableDamageTypes = [
 ];
 
 var classSpecificValues = {
-	"Barb": {mainStatScaling: 10},
+	"Barbarian": {mainStatScaling: 10},
 	"Druid": {mainStatScaling: 8},
 	"Necro": {mainStatScaling: 8},
 	"Rogue": {mainStatScaling: 9},
 	"Sorc": {mainStatScaling: 8},
 	"Spiritborn": {mainStatScaling: 8}
 }
+var defaultMainStatScaling = 10;
 
 function buildCalculator(containerEle, options){
 	var Calculator = {
@@ -242,16 +243,19 @@ function buildCalculator(containerEle, options){
 		}
 		resultContainer.appendChild(grp);
 	}
-	function addCustom(str, addClass){
+	function addCustom(str, addClass, isDetail){
 		var div = document.createElement("div");
 		div.className = "group";
+		if (isDetail){
+			div.classList.add("detail");
+		}
 		if (addClass) div.className += " " + addClass;
 		div.innerHTML = str;
 		resultContainer.appendChild(div);
 	}
 	
 	function updateClassSpecificValues(){
-		var mainStatScaling = (classSpecificValues[getCharClass()] || {}).mainStatScaling || 10;
+		var mainStatScaling = (classSpecificValues[getCharClass()] || {}).mainStatScaling || defaultMainStatScaling;
 		mainStatDmgEle.value = (mainStatEle.value / mainStatScaling).toFixed(1);
 	}
 	
@@ -345,7 +349,7 @@ function buildCalculator(containerEle, options){
 				"Core damage (no vulnerable/crit./overpower) after all additive and multiplicative modifiers have been applied.", false, true);
 		}
 		addResult("Max. damage after multipliers", totalDamage, multiModFactor, multiModColor,
-			"Max. damage for most powerful hit, after all additive and multiplicative modifiers have been applied.", false, true);
+			"Max. damage for most powerful hit, after all additive and multiplicative modifiers have been applied (except the separate base multipliers for vuln./crit./overp.).", false, true);
 		
 		addCustom("<hr>", "flat");
 		
@@ -369,8 +373,8 @@ function buildCalculator(containerEle, options){
 			addResult("Damage to vulnerable enemies", vulnerableBaseDamage, effectiveVulnerableDamageFactor, vulnerableColor,
 				"Damage done to vulnerable enemies (no crit, no overpower) including previous modifiers for type vulnerable. " 
 				+ "Base factor: " + Number(vulnerableDamageFactor).toFixed(2) 
-				+ ", effective factor: " + Number(effectiveVulnerableDamageFactor).toFixed(2) + ".", false, true);
-			addCustom("<hr>", "flat");
+				+ ", effective factor: " + Number(effectiveVulnerableDamageFactor).toFixed(2) + ".", true, true);
+			addCustom("<hr>", "flat", true);
 		}
 		if (doCalcCrit.checked){
 			//var critDamageAdditiveAsFactorIncVul = 1.0 + ((+critDamageAddEle.value || 0.0) / (addModFactor * vulnerableDamageAdditiveAsFactor)) / 100;	//it is in add. pool now
@@ -383,7 +387,7 @@ function buildCalculator(containerEle, options){
 			addResult("Damage with critical hit", critBaseDamage, effectiveCritDamageFactor, critColor,
 				"Damage done with critical hits (not vulnerable, no overpower) including previous modifiers for type crit. "
 				+ "Base factor: " + Number(critDamageFactor).toFixed(2) 
-				+ ", effective factor: " + Number(effectiveCritDamageFactor).toFixed(2) + ".", false, true);
+				+ ", effective factor: " + Number(effectiveCritDamageFactor).toFixed(2) + ".", true, true);
 			/*
 			let previousBaseDamage = coreDamage * addModFactor * multiModFactor;
 			var critChancePct = +critChanceEle.value || 0;
@@ -393,7 +397,7 @@ function buildCalculator(containerEle, options){
 				"Average damage of a critical hit (not vulnerable, no overpower), factoring in the critical hit chance, " 
 				+ "e.g. 30% crit chance means (70% core damage + 30% crit damge).", false, true);
 			*/
-			addCustom("<hr>", "flat");
+			addCustom("<hr>", "flat", true);
 		}
 		if (doCalcOverpower.checked){
 			totalDamage *= overpowerDamageFactor;
@@ -406,15 +410,15 @@ function buildCalculator(containerEle, options){
 			addResult("Damage with overpower", overpowerBaseDamage, effectiveOverpowerDamageFactor, overpowerColor,
 				"Damage done with overpower hits without modifiers like crit. or vulnerable, but including previous modifiers for type overpower. "
 				+ "Base factor: " + Number(overpowerDamageFactor).toFixed(2) 
-				+ ", effective factor: " + Number(effectiveOverpowerDamageFactor).toFixed(2) + ".", false, true);
-			addCustom("<hr>", "flat");
+				+ ", effective factor: " + Number(effectiveOverpowerDamageFactor).toFixed(2) + ".", true, true);
+			addCustom("<hr>", "flat", true);
 		}
 		if (!hasModifier){
 			addResult("Total max. damage per hit", totalDamage, undefined, undefined,
-				"Total max. damage possible per hit with all the given modifiers combined, but before any damage reduction penalties.", false, true);
+				"Total max. damage possible per hit with all the given modifiers combined (now including the base multipliers for vuln./crit./overp.), but before any damage reduction penalties.", false, true);
 		}else{
 			addResult("Total max. damage per hit", totalDamage, undefined, undefined,
-				"Total max. damage per hit with all the given modifiers combined, but before any damage reduction penalties.", false, true);
+				"Total max. damage per hit with all the given modifiers combined (now including the base multipliers for vuln./crit./overp.), but before any damage reduction penalties.", false, true);
 		}
 		addCustom("<hr>", "flat");
 				
@@ -767,12 +771,12 @@ function buildCalculator(containerEle, options){
 		clearCalculation();
 		
 		if (charClassEle) charClassEle.value = data.charClass || "";
-		baseDamageEle.value = data.baseDamage || 100;
+		baseDamageEle.value = data.baseDamage || 596;
 		attackSpeedEle.value = data.attackSpeed || 1.0;
 		skillDamageEle.value = data.skillDamage || 50;
-		mainStatEle.value = data.mainStat || 100;
-		baseLifeEle.value = data.baseLife || 100;
-		maxLifeEle.value = data.maxLife || 150;
+		mainStatEle.value = data.mainStat || 1500;
+		baseLifeEle.value = data.baseLife || 400;
+		maxLifeEle.value = data.maxLife || 3000;
 		isFortified.checked = data.isFortified;
 		vulnerableDamageEle.value = data.vulnerableDamage || 20;
 		vulnerableDamageAddEle.value = data.vulnerableDamageAdd || 0;
@@ -884,9 +888,9 @@ function buildCalculator(containerEle, options){
 		addAdditiveMod("Example: Damage on Monday", 69);
 		addMultiplierMod("Example: Crit. Bonus", 18, false, ["crit"]);
 		addMultiplierMod("Example: Tibaults Will", 40);
-		addReductionMod("Character lvl. damage reduction", 75);
+		addReductionMod("Monster damage reduction (lvl 60)", 97);
 	}else if (!options?.cfg && options?.addDemoContent !== false){
-		addReductionMod("Character lvl. damage reduction", 75);
+		addReductionMod("Monster damage reduction (lvl 60)", 97);
 	}
 	//Show/hide footer?
 	if (!options?.showFooter){
