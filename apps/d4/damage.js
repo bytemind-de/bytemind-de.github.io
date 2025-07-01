@@ -602,7 +602,8 @@ function buildCalculator(containerEle, options){
 			//Overpower attacks gain +2% damage per 1% of your Base Life you have in Fortify.
 			//discussion: https://us.forums.blizzard.com/en/d4/t/new-formula-for-overpower-damage-in-120/128302/40
 			//Changes for season 3: damage per 1% reduced from 2% to 1% for both bonus and fortified life
-			let dmgPer1pct = 1.0;
+			//Changes for season 9: life and fortify scaling removed
+			let dmgPer1pct = 0.0;
 			let overpowerAddDmgPercentLife = (+maxLifeEle.value - +baseLifeEle.value)/+baseLifeEle.value * 100 * dmgPer1pct;
 			let overpowerAddDmgPercentFortify = isFortified.checked? ((+maxLifeEle.value/+baseLifeEle.value) * 100 * dmgPer1pct) : 0.0;
 			let bonusLifeFactor = overpowerAddDmgPercentLife/100;
