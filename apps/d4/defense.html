@@ -12,6 +12,15 @@
 	<script defer src="common.js?v=0.16.0"></script>
 	<script defer src="defense.js?v=0.6.0"></script>
 	<script defer src="data/defense-labels.js?v=0.6.0"></script>
+	<script>
+		<!-- deprecation info -->
+		window.addEventListener('DOMContentLoaded', (ev) => {
+			showPopUp("Deprecation note:<br><br>" 
+				+ "Due to the defense changes in S11 this calculator is out of date and needs a rework.<br><br>" 
+				+ "In the meantime, please use the new in-game <b>'toughness'</b> stat," 
+				+ " it will calculate your effective HP for you in a very similar way.", [], {easyClose: true});
+		});
+	</script>
 
 	<title>D4 Defense Calculator</title>
 	<!-- open graph settings -->
