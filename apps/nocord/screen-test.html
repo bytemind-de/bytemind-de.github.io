@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Safe Area Live Monitor</title>
+    <style>
+        /* CSS variables to read safe-areas in JS */
+        :root {
+            --sat: env(safe-area-inset-top);
+            --sar: env(safe-area-inset-right);
+            --sab: env(safe-area-inset-bottom);
+            --sal: env(safe-area-inset-left);
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #121212;
+            color: #2196f3;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+        .monitor {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 16px;
+            border: 1px solid #333;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+        .value { color: #fff; font-weight: bold; font-family: monospace; font-size: 1.2em; }
+
+        /* "Unsafe" areas at edges */
+        .edge { position: fixed; background: rgba(255, 0, 0, 0.3); z-index: 10; pointer-events: none; }
+        .top { top: 0; left: 0; right: 0; height: var(--sat); border-bottom: 1px solid red; }
+        .right { top: 0; right: 0; bottom: 0; width: var(--sar); border-left: 1px solid red; }
+        .bottom { bottom: 0; left: 0; right: 0; height: var(--sab); border-top: 1px solid red; }
+        .left { top: 0; left: 0; bottom: 0; width: var(--sal); border-right: 1px solid red; }
+    </style>
+</head>
+<body>
+    <div class="edge top"></div>
+    <div class="edge right"></div>
+    <div class="edge bottom"></div>
+    <div class="edge left"></div>
+    <div class="monitor">
+        <h2 style="margin-top:0">Safe Area Insets</h2>
+        <div style="margin: 10px 0;">Top: <span id="top" class="value">0px</span></div>
+        <div style="margin: 10px 0;">Right: <span id="right" class="value">0px</span></div>
+        <div style="margin: 10px 0;">Bottom: <span id="bottom" class="value">0px</span></div>
+        <div style="margin: 10px 0;">Left: <span id="left" class="value">0px</span></div>
+        <p style="font-size: 0.8em; color: #888; margin-top:20px;">
+            Rotate your device to see live updates
+        </p>
+		<input>
+    </div>
+    <script>
+        function updateSafeAreas() {
+            const styles = getComputedStyle(document.documentElement);
+            const sides = {
+                'top': '--sat',
+                'right': '--sar',
+                'bottom': '--sab',
+                'left': '--sal'
+            };
+            for (const [id, prop] of Object.entries(sides)) {
+                const val = styles.getPropertyValue(prop).trim();
+                document.getElementById(id).textContent = val || '0px';
+            }
+        }
+        window.addEventListener('resize', updateSafeAreas);
+        window.addEventListener('orientationchange', updateSafeAreas);
+        updateSafeAreas();
+        setTimeout(updateSafeAreas, 300);
+    </script>
+</body>
+</html>

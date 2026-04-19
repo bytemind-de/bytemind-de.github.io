@@ -1,0 +1,26 @@
+{
+  "name": "NoCord-P2P",
+  "short_name": "NoCord",
+  "description": "Low-Bandwidth P2P Audio & Chat",
+  "start_url": "/apps/nocord/",
+  "display": "standalone",
+  "background_color": "#080b10",
+  "theme_color": "#0c1118",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["communication", "utilities"],
+  "prefer_related_applications": false
+}

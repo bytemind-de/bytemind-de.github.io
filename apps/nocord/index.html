@@ -1,38 +1,362 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NoCord-P2P</title>
-    
-    <meta name="theme-color" content="#0c1118">
-    <meta property="og:title" content="NoCord-P2P">
-    <meta property="og:description" content="NoCord-P2P - Low-Bandwidth Peer-to-Peer Audio & Chat">
-    <meta property="og:image" content="img/icon-256.png">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #0c1118;
-			color: #fff;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-			font-family: sans-serif;
-        }
+	<title>NoCord-P2P</title>
+	<meta name="title" content="NoCord-P2P">
+	<meta name="description" content="NoCord-P2P - Low-Bandwidth Peer-to-Peer Audio & Chat">
+	<meta name="theme-color" content="#0c1118">
+	<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+	<link rel="manifest" href="manifest.json">
 
-        img {
-            max-width: 90%;
-            height: auto;
-            display: block;
-        }
-    </style>
+	<!-- Open Graph -->
+	<meta property="og:type" content="website">
+	<meta property="og:url" content="https://bytemind-de.github.io/apps/nocord/">
+	<meta property="og:title" content="NoCord-P2P">
+	<meta property="og:description" content="NoCord-P2P - Low-Bandwidth Peer-to-Peer Audio & Chat">
+	<meta property="og:image" content="https://bytemind-de.github.io/apps/nocord/img/icon-192.png" />
+	<meta property="og:image:width" content="192" />
+	<meta property="og:image:height" content="192" />
+	<meta property="og:image:type" content="image/png" />
+	<meta property="og:image:alt" content="NoCord Icon" />
+
+	<!-- Styles -->
+	<link rel="stylesheet" href="fonts/material-icons.css">
+	<link rel="stylesheet" href="main.css">
+
+	<!-- PeerJS via CDN (muss vor main.js geladen sein, kein Modul) -->
+	<script type="text/javascript" src="peer-js/peerjs-1.5.5.min.js"></script>
+	<!-- SEPIA Web Audio (lokal unter web-audio/) -->
+	<script type="text/javascript" src="web-audio/sepia-web-audio.min.js?v=0.9.12"></script>
+	<script>
+		if (window.SepiaFW) SepiaFW.webAudio.defaultProcessorOptions.moduleFolder = "web-audio/modules";
+		else alert("SEPIA Web Audio Library not found or not supported (IE11?)!");
+	</script>
+
+	<!-- Entry Point als ES Module (automatisch deferred) -->
+	<script type="module" src="main.js"></script>
 </head>
 <body>
-	<h2>NoCord-P2P</h2>
-    <img src="img/icon-256.png" alt="NoCord-P2P Icon">
-	<h3>UNDER CONSTRUCTION</h3>
+	<div id="app">
+		<!-- HEADER -->
+		<header id="header">
+			<div id="logo">No<span>Cord</span><span style="color:var(--text-2)">-P2P</span></div>
+			<div class="header-sapcer" style="flex: 1 1; height: 100%;"></div>
+			<div id="global-status" class="offline" onclick="checkConnectionStatus(true)">
+				<div class="dot"></div><span id="status-text">Offline</span>
+			</div>
+			<div id="header-meta">
+				<span id="toggle-header-menu-btn" class="material-icons font-header type-button active rot-transition" translate="no" onclick="toggleHeaderMenu()"
+					title="Toggle context menu">tune</span>
+			</div>
+			<div id="header-context-menu-container">
+				<div class="header-context-menu">
+					<span id="page-reload-btn" class="material-icons font-header-sm type-button active" translate="no" onclick="window.location.reload();"
+						title="Reload app">sync</span>
+					<span id="toggle-fullscreen-btn" class="material-icons font-header-sm type-button" translate="no" onclick="toggleFullscreen()"
+						title="Toggle full-screen">fullscreen</span>
+					<span id="toggle-wake-lock-btn" class="material-icons font-header-sm type-button" translate="no" onclick="toggleScreenWakeLock()"
+						title="Toggle screen wake-lock">phonelink_lock</span>
+					<span id="toggle-menu-btn" class="material-icons font-header-sm type-button active" translate="no" onclick="toggleMenu()"
+						title="Toggle main menu">vertical_split</span>
+				</div>
+			</div>
+		</header>
+
+		<!-- SIDEBAR -->
+		<aside id="sidebar">
+
+			<!-- §1 Audio -->
+			<div class="panel collapsed" id="panel-audio">
+				<div class="panel-header" onclick="togglePanel('panel-audio')">
+					<span class="panel-icon"><span class="material-icons font-section" translate="no">mic</span></span>
+					<span class="panel-label">Audio Settings</span>
+					<span class="panel-chevron"><span class="material-icons font-section" translate="no">expand_more</span></span>
+				</div>
+				<div class="panel-body">
+					<div class="field">
+						<label>Microphone (Input)</label>
+						<div style="display: flex; gap: 8px; align-items: center;">
+							<div class="select-wrap" style="flex-grow: 1;">
+								<select id="mic-select">
+									<option>Loading devices…</option>
+								</select>
+							</div>
+							<button id="reload-mic-devices" onclick="enumAudioDevices()" class="btn btn-ghost btn-sm btn-circ" title="Reload">
+								<span class="material-icons font-btn" translate="no">refresh</span>
+							</button>
+						</div>
+					</div>
+					<div class="field">
+						<label>Speaker (Output)</label>
+						<div style="display: flex; gap: 8px; align-items: center;">
+							<div class="select-wrap" style="flex-grow: 1;">
+								<select id="sink-select" onchange="onSinkChange()">
+									<option value="">Default</option>
+								</select>
+							</div>
+						</div>
+					</div>
+					<div class="field">
+						<label>Sampling Rate</label>
+						<div class="select-wrap">
+							<select id="sample-rate-select">
+								<option value="" selected>Default (native)</option>
+								<option value="16000">16 kHz - Speech (ASR)</option>
+								<option value="22050">22 kHz - Low-Fi / FM Radio</option>
+								<option value="32000">32 kHz - Broadcast</option>
+								<option value="44100">44 kHz - High-Fi</option>
+								<option value="48000">48 kHz - Studio</option>
+							</select>
+						</div>
+					</div>
+					<div class="field">
+						<label>Bitrate (Opus SDP)</label>
+						<div class="select-wrap">
+							<select id="bitrate-select">
+								<option value="8000">8 kbps - Minimal</option>
+								<option value="12000">12 kbps - Very low</option>
+								<option value="16000">16 kbps - Low</option>
+								<option value="24000">24 kbps - Compressed</option>
+								<option value="32000">32 kbps - Balanced</option>
+								<option value="48000" selected>48 kbps - Default</option>
+								<option value="96000">96 kbps - High</option>
+								<option value="128000">128 kbps - Studio</option>
+							</select>
+						</div>
+					</div>
+					<div class="field">
+						<label>Audio processing</label>
+						<div class="checkbox-container">
+							<label>
+								<input type="checkbox" id="chk-ec" class="audio-constraint" data-name="echoCancellation"
+									onchange="onConstraintChange()" checked> Echo-Cancellation
+							</label>
+							<label>
+								<input type="checkbox" id="chk-ns" class="audio-constraint" data-name="noiseSuppression"
+									onchange="onConstraintChange()"> Noise-Suppression
+							</label>
+							<label>
+								<input type="checkbox" id="chk-vi" class="audio-constraint" data-name="voiceIsolation"
+									onchange="onConstraintChange()"> Voice-Isolation
+							</label>
+							<label>
+								<input type="checkbox" id="chk-agc" class="audio-constraint" data-name="autoGainControl"
+									onchange="onConstraintChange()"> Auto-Gain
+							</label>
+						</div>
+					</div>
+					<div class="field">
+						<label>Latency settings</label>
+						<div class="select-wrap">
+							<select id="audio-buffer-settings">
+								<option value="0" selected>System (no processing)</option>
+								<option value="1">Aggressive (low latency)</option>
+								<option value="2">Balanced</option>
+								<option value="3">Relaxed (high latency)</option>
+							</select>
+						</div>
+					</div>
+					<div class="field">
+						<label style="display:flex; justify-content:space-between;">
+							<span>Microphone gain</span><span id="mic-gain-label">[1.0]</span>
+						</label>
+						<input type="range" id="mic-custom-gain" min="0.1" max="5" step="0.1" value="1.0"
+							oninput="document.getElementById('mic-gain-label').textContent = '[' + (+this.value).toFixed(1) + ']';"/>
+					</div>
+					<div class="field btn-row" style="margin-top:10px">
+						<button id="btn-test-mic" class="btn btn-ghost btn-sm" onclick="testMic()"
+							><span class="material-icons font-btn" translate="no">play_arrow</span>Test</button>
+						<button id="btn-mute-mic" class="btn btn-ghost btn-sm" onclick="muteToggle()" disabled
+							title="Mute microphone (send 0 signal)"><span class="material-icons font-btn" translate="no">mic_off</span></button>
+						<button id="btn-pause-mic" class="btn btn-ghost btn-sm" onclick="pauseToggle()" disabled
+							title="Paus microphone (stop processing)"><span class="material-icons font-btn" translate="no">pause</span></button>
+						<button id="btn-stop-mic" class="btn btn-danger btn-sm" onclick="stopMic()" disabled
+							><span class="material-icons font-btn" translate="no">stop</span>Stop</button>
+						<button id="btn-pause-mic" class="btn btn-ghost btn-sm" onclick="debugAudio()"
+							title="Show debug info for audio processor"><span class="material-icons font-btn" translate="no">bug_report</span></button>
+					</div>
+					<div class="field" style="margin-top:8px;display:flex;align-items:center;gap:8px">
+						<audio id="mic-test-player" controls
+							style="flex:1;width:calc(100% - 24px);height:32px;display:none"></audio>
+						<button id="btn-clear-recording" onclick="clearTestRecording()"	style="display:none;" class="btn btn-danger btn-sm btn-circ"
+							title="Aufnahme löschen"><span class="material-icons font-btn" translate="no">clear</span></button>
+					</div>
+					<div class="field">
+						<label>Microphone level</label>
+						<div id="mic-level-bar">
+							<div id="mic-level-fill"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- §2 Verbindung + Raum -->
+			<div class="panel" id="panel-conn">
+				<div class="panel-header" onclick="togglePanel('panel-conn')">
+					<span class="panel-icon"><span class="material-icons font-section" translate="no">hub</span></span>
+					<span class="panel-label">Connection & Room</span>
+					<span class="panel-chevron"><span class="material-icons font-section" translate="no">expand_more</span></span>
+				</div>
+				<div class="panel-body">
+					<div class="field">
+						<label>Signaling server</label>
+						<div class="select-wrap">
+							<select id="signaling-preset" onchange="onSignalingChange()">
+								<option value="peerjs">PeerJS Cloud (Default)</option>
+								<option value="custom">Custom Server</option>
+							</select>
+						</div>
+					</div>
+					<div class="field" id="custom-server-field" style="display:none">
+						<label>Server URL (ws://…)</label>
+						<input type="url" id="custom-server-url" placeholder="ws://0.0.0.0:9000/peerjs">
+					</div>
+					<div class="field flex-group">
+						<button class="btn btn-danger btn-sm" id="btn-disconnect-server" onclick="disconnectServer()"
+							disabled>Disconnect</button>
+						<span id="my-peer-id" onclick="copyPeerId()" title="Click to copy peer ID">-</span>
+					</div>
+					<hr style="border:0;margin:10px 0" noshade>
+					<div class="field">
+						<label>User name</label>
+						<input type="text" id="room-username" placeholder="Choose a user name">
+					</div>
+					<div class="field">
+						<label>Room name</label>
+						<input type="text" id="room-name" placeholder="For example: myteam-42">
+					</div>
+					<div class="field">
+						<label>Room password</label>
+						<input type="password" id="room-password" placeholder="Optional passwort to hide the room">
+					</div>
+					<div class="field btn-row" style="margin-top: 16px;">
+						<button class="btn btn-primary btn-sm" id="btn-create-room" onclick="createRoom()">
+							<span class="material-icons font-btn" translate="no">add</span>Create</button>
+						<button class="btn btn-ghost btn-sm" id="btn-join-room" onclick="joinRoom()">
+							<span class="material-icons font-btn" translate="no">share</span>Join</button>
+						<button class="btn btn-danger btn-sm" id="btn-leave-room" onclick="leaveRoom()" disabled>
+							<span class="material-icons font-btn" translate="no">close</span>Leave</button>
+					</div>
+					<!-- TODO: move to a better location?
+					<div id="room-status" style="font-size:.68rem;color:var(--accent);margin-top:6px;min-height:1em"></div>-->
+				</div>
+			</div>
+
+			<!-- §3 Teilnehmer -->
+			<div class="panel" id="panel-peers">
+				<div class="panel-header" onclick="togglePanel('panel-peers')">
+					<span class="panel-icon"><span class="material-icons font-section" translate="no">group</span></span>
+					<span class="panel-label">Peers</span>
+					<span class="panel-chevron"><span class="material-icons font-section" translate="no">expand_more</span></span>
+				</div>
+				<div class="panel-body">
+					<div class="field">
+						<div id="room-peer-list">
+							<div class="room-info-text">Room is empty</div>
+						</div>
+					</div>
+					<div class="field btn-row">
+						<button class="btn btn-ghost btn-sm" id="btn-refresh-peer-list" onclick="requestRoomRefresh()">Refresh</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- §4 Bandbreite -->
+			<div class="panel collapsed" id="panel-bw">
+				<div class="panel-header" onclick="togglePanel('panel-bw')">
+					<span class="panel-icon"><span class="material-icons font-section" translate="no">insert_chart</span></span>
+					<span class="panel-label">Bandwidth</span>
+					<span class="panel-chevron"><span class="material-icons font-section" translate="no">expand_more</span></span>
+				</div>
+				<div class="panel-body">
+					<div class="field">
+						<div id="bw-stats">
+							<div class="bw-row">
+								<div class="bw-label"><span>Audio combined</span><span id="bw-audio-val">0 kb/s</span></div>
+								<!--<div class="bw-bar-track">
+									<div id="bw-audio-bar" class="bw-bar-fill audio" style="width:0%"></div>
+								</div>-->
+							</div>
+						</div>
+						<canvas class="sparkline" id="sparkline-canvas" width="268" height="30"></canvas>
+					</div>
+					<div class="field">
+						<label>Target bandwidth max. [kb/s]:</label>
+						<input type="text" id="kbps-target-max" placeholder="250" value="250">
+					</div>
+				</div>
+			</div>
+
+			<!-- Alt. action buttons -->
+			<!--<div class="panel" id="panel-actions">
+				<div class="panel-body">
+					<div class="field btn-row">
+						<button class="btn btn-ghost btn-sm" id="" onclick="">Test</button>
+					</div>
+				</div>
+			</div>-->
+
+		</aside>
+
+		<!-- MAIN: Chat -->
+		<main id="main">
+			<div id="chat-area">
+				<div id="chat-header">
+					<span id="toggle-header-menu-btn-alt" class="material-icons font-section type-button hidden-hmax" translate="no" onclick="toggleMenu()"
+						title="Toggle main menu" style="padding: 0px 2px;">vertical_split</span>
+					<span id="chat-title">Chat</span>
+					<div id="connected-peers-badges"></div>
+					<span class="material-icons font-section type-button" translate="no" onclick="filterChatMessages()"
+						title="Filter chat messages" style="padding: 0px 2px;">filter_list</span>
+					<!--<span id="header-peer-id" style="color:var(--text-2)">-</span>-->
+				</div>
+
+				<div id="chat-messages">
+					<div id="empty-chat">
+						<div class="big">NoCord</div>
+						<span><u onclick="createRoom()" style="cursor: pointer;">Create</u> a room or 
+							<u onclick="joinRoom()" style="cursor: pointer;">join</u> one to get started</span>
+					</div>
+				</div>
+
+				<div id="chat-input-area" style="padding-left: 12px;">
+					<div id="file-drop-zone" onclick="document.getElementById('file-input').click()">
+						<span class="material-icons font-section" translate="no">folder</span>Drop file or click to select (max. 50 MB)
+						<input type="file" id="file-input" style="display:none" onchange="handleFileSelect(event)">
+					</div>
+					<div id="chat-input-row">
+						<div class="group" onclick="muteToggle()"
+							style="display: flex; align-items: center; margin-right: 2px; cursor: pointer;"
+							><div id="chat-mic-level-bar" class="masked"><div id="chat-mic-level-fill"></div></div>
+						</div>
+						<textarea id="chat-input" placeholder="Nachricht…" rows="1"></textarea>
+						<div class="group" style="display: flex; gap: 8px; align-items: center;">
+							<button class="btn btn-ghost btn-sm" onclick="toggleFileZone()" title="Datei senden">
+								<span class="material-icons font-section" translate="no">upload_file</span>
+							</button>
+							<button class="btn btn-primary btn-sm" onclick="sendChatMessage()" id="btn-send" disabled>
+								<span class="material-icons font-section" translate="no">send</span>
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</main>
+
+	</div>
+
+	<!-- Toast container -->
+	<div id="toast-container"></div>
+
+	<!-- Lightbox -->
+	<div id="modal-overlay">
+		<img id="modal-img" src="" alt="">
+	</div>
+
 </body>
+
 </html>
