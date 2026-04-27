@@ -20,13 +20,17 @@ import {
 	removePeerConnection, onSignalingChange,
 	setupPeerModule
 } from './peer.js';
-import { createRoom, joinRoom, leaveRoom, requestRoomRefresh } from './room.js';
+import { createRoom, joinRoom, showRoomQuickAccessPrompt,
+	leaveRoom, leaveRoomButton, createInviteUrl,
+	requestRoomRefreshButton, setupRoomModule
+} from './room.js';
 import { sendChatMessage, sendFile } from './transfer.js';
 import {
-	toggleHeaderMenu, toggleMenu, togglePanel, collapseAllSidebarPanels,
+	toggleHeaderMenu, toggleHeaderMenuSidebar, toggleMenu,
+	togglePanel, collapseAllSidebarPanels,
 	checkConnectionStatus, filterChatMessages, copyPeerId,
 	toggleFileZone, onChatKey, autoResize, closeLightbox,
-	setupUi
+	createPrompt, closePrompt, setupUi
 } from './ui.js';
 import { toggleScreenWakeLock, toggleFullscreen,
 	updateScreenStateAsync, setupDeviceModule
@@ -37,9 +41,30 @@ if ('serviceWorker' in navigator) {
 	navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 
+// -- Color scheme switching ----------------------------------
+function setColorScheme(newScheme) {
+	if (newScheme != window.appColorScheme) {
+		document.documentElement.classList.remove(window.appColorScheme);
+		document.documentElement.classList.add(newScheme);
+		window.appColorScheme = newScheme;
+	}
+	try {
+		window.localStorage.setItem('user-color-scheme', window.appColorScheme);
+	} catch (e) {
+		console.error("[color-scheme] Failed to store setting in local storage.");
+	}
+}
+function toggleLightDarkColorTheme(){
+	if (window.appColorScheme == 'light') setColorScheme('dark');
+	else if (window.appColorScheme == 'dark') setColorScheme('light');
+	//NOTE: if its neither of both we do nothing
+}
+
 // -- Global function exports for inline onclick in HTML ------
 // ES modules have no global scope -- expose explicitly to window.
 Object.assign(window, {
+	setColorScheme,
+	toggleLightDarkColorTheme,
 	// Panel
 	togglePanel,
 	// Audio
@@ -60,10 +85,12 @@ Object.assign(window, {
 	callPeer,
 	hangupAll,
 	copyPeerId,
+	showRoomQuickAccessPrompt,
 	createRoom,
 	joinRoom,
-	leaveRoom,
-	requestRoomRefresh,
+	createInviteUrl,
+	leaveRoomButton,
+	requestRoomRefreshButton,
 	// Chat & transfer
 	sendChatMessage,
 	toggleFileZone,
@@ -71,10 +98,13 @@ Object.assign(window, {
 	autoResize,
 	handleFileSelect,
 	// UI
+	createPrompt,
+	closePrompt,
 	closeLightbox,
 	filterChatMessages,
 	toggleMenu,
 	toggleHeaderMenu,
+	toggleHeaderMenuSidebar,
 	// Device
 	toggleScreenWakeLock,
 	toggleFullscreen
@@ -134,5 +164,6 @@ window.addEventListener('beforeunload', () => {
 // -- Init ----------------------------------------------------
 await setupUi();
 await setupAudioModule();
-await setupPeerModule();
 await setupDeviceModule();
+await setupPeerModule();
+await setupRoomModule();

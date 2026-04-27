@@ -34,8 +34,11 @@ function loadElements() {
 		app: document.getElementById('app'),
 		headerMenu: document.getElementById('header-context-menu-container'),
 		headerMenuButton: document.getElementById('toggle-header-menu-btn'),
+		headerMenuSidebar: document.getElementById('sidebar-header-context-menu'),
+		headerMenuSidebarButton: document.getElementById('toggle-header-menu-sidebar-btn'),
 		sidebar: document.getElementById('sidebar'),
 		sidebarToggle: document.getElementById('toggle-menu-btn'),
+		promptModalOverlay: document.getElementById('prompt-overlay'),
 		sparklineCanvas: document.getElementById('sparkline-canvas'),
 		targetBwMax: document.getElementById('kbps-target-max')
 	}
@@ -47,6 +50,10 @@ export function toggleHeaderMenu() {
 	uiElements.headerMenu.classList.toggle('open');
 	//uiElements.headerMenuButton.classList.toggle('active');
 	uiElements.headerMenuButton.classList.toggle('rot90');
+}
+export function toggleHeaderMenuSidebar() {
+	uiElements.headerMenuSidebar.classList.toggle('open');
+	uiElements.headerMenuSidebarButton.classList.toggle('rot90');
 }
 export function toggleMenu() {
 	uiElements.app.classList.toggle('sidebar-off');
@@ -510,6 +517,186 @@ export function showPlayButton(pid) {
 	};
 
 	document.getElementById('chat-header').appendChild(btn);
+}
+
+// -- Prompt --------------------------------------------------
+export function createPrompt(data, callbackFun) {
+	let promptId;
+	if (data?.promptId) promptId = data.promptId;
+	else promptId = ++promptIdIndex;
+	const pm = document.createElement('div');
+	pm.className = "prompt-modal";
+	pm.dataset.promptId = promptId;
+	if (data.targetWidth){
+		pm.style.width = data.targetWidth;
+	}
+	const pmCloseBtn = document.createElement('button');
+	pmCloseBtn.className = "btn btn-sm btn-circ prompt-modal-close-btn";
+	pmCloseBtn.innerHTML = '<span class="material-icons font-inherit" translate="no">close</span>';
+	pmCloseBtn.onclick = () => { closePrompt(pm); };
+	pm.appendChild(pmCloseBtn);
+	const pmBody = document.createElement('div');
+	pmBody.className = "prompt-modal-content";
+	const dataCollector = [];
+	if (data?.contentHtml){
+		pmBody.innerHTML = data.contentHtml;
+	}else if (data?.contentForm){
+		/* example: [
+			{type: "section-header", value: "Section Header"},
+			{type: "info-text", value: "Info Text"},
+			{type: "input", name: "input", value: "hello world"},
+			{type: "checkbox", name: "ok", uiName: "ok?", value: false}
+		] */
+		const form = document.createElement("form");
+		data.contentForm.forEach((field) => {
+			const fieldEle = document.createElement("field");
+			fieldEle.className = "field";
+			const type = field.type || "input";
+			if ((field.uiName ?? field.name) && !field.skipLabel){
+				const label = document.createElement("label");
+				label.textContent = field.uiName ?? field.name;
+				//label.htmlFor = field.name;
+				fieldEle.appendChild(label);
+			}
+			let inputEle;
+			switch (type) {
+				case 'section-header':
+					inputEle = document.createElement("h3");
+					inputEle.textContent = field.value;
+					break;
+				case 'info-text':
+					inputEle = document.createElement("p");
+					inputEle.textContent = field.value;
+					break;
+				case 'input':
+				case 'text':
+				case 'password':
+				case 'url':
+				case 'number':
+					inputEle = document.createElement("input");
+					inputEle.type = (type == "input")? "text" : type;
+					inputEle.value = field.value;
+					dataCollector.push(() => {
+						let val = (type == "number")? +inputEle.value : inputEle.value;
+						return [field.name, val];
+					});
+					break;
+				case 'checkbox':
+				case 'boolean':
+					inputEle = document.createElement("input");
+					inputEle.type = "checkbox";
+					inputEle.checked = !!field.value;
+					fieldEle.classList.add("flex-group");
+					dataCollector.push(() => {
+						return [field.name, !!inputEle.checked];
+					});
+					break;
+				case 'select':
+					inputEle = document.createElement("select");
+					field.selectOptions?.forEach((o, index) => {
+						//{name: "My Option", value: "my_opt"}
+						const so = document.createElement("option");
+						so.textContent = o.name || index;
+						so.value = o.value ?? index;
+					});
+					inputEle.value = field.value;
+					dataCollector.push(() => {
+						return [field.name, inputEle.value];
+					});
+					break;
+				case 'datetime':
+				case 'datetime-local':
+					inputEle = document.createElement("input");
+					inputEle.type = "datetime-local";
+					inputEle.value = _convertIsoToInputDate(field.value);
+					dataCollector.push(() => {
+						return [field.name, _convertInputToIsoDate(inputEle.value)];
+					});
+					break;
+				default:
+					break;
+			}
+			if (field.name) inputEle.name = field.name;
+			if (field.disabled) inputEle.disabled = true;
+			fieldEle.appendChild(inputEle);
+			form.appendChild(fieldEle);
+		});
+		pmBody.appendChild(form);
+	}else{
+		pmBody.innerHTML = "<p>Hello World</p>";
+	}
+	pm.appendChild(pmBody);
+	const buttons = data?.buttons || ['ok'];  //'ok', 'cancel', {...}
+	const buttonBox = buttons?.length? document.createElement("div") : null;
+	const submitFun = function(eventName, eventData){
+		if (callbackFun) callbackFun(eventName, eventData);
+		closePrompt(pm);
+	}
+	buttons.forEach((btn) => {
+		const btnEle = document.createElement("button");
+		btnEle.className = "btn btn-sm";
+		if (btn == 'ok'){
+			btnEle.textContent = "Ok";
+			btnEle.classList.add('btn-primary');
+			btnEle.onclick = function(){
+				let data = Object.fromEntries(dataCollector.map(fn => fn()));
+				submitFun(btn, data);
+			};
+		}else if (btn == 'cancel'){
+			btnEle.textContent = "Cancel";
+			btnEle.classList.add('btn-ghost');
+			btnEle.onclick = function(){ submitFun(btn); };
+		}else if (typeof btn == 'object'){
+			//{name: "My Button", value: "event_name"}
+			btnEle.textContent = btn.name || "Button";
+			if (btn.addClass) btnEle.classList.add(btn.addClass);
+			btnEle.onclick = function(){
+				let data = Object.fromEntries(dataCollector.map(fn => fn()));
+				submitFun(btn.value, data);
+			};
+		}else{
+			btnEle.textContent = btn;
+			btnEle.onclick = function(){ submitFun(btn); };
+		}
+		buttonBox.appendChild(btnEle);
+	});
+	if (buttonBox){
+		buttonBox.className = "field btn-row";
+		buttonBox.style.cssText = "margin: 10px 8px; justify-content: center;";
+		pm.appendChild(buttonBox);
+	}
+	uiElements.promptModalOverlay.appendChild(pm);
+	uiElements.promptModalOverlay.classList.add("open");
+	return pm;
+}
+export function closePrompt(promptIdOrEle) {
+	let pm;
+	if (typeof promptIdOrEle == "string") {
+		pm = uiElements.promptModalOverlay.querySelector("[data-prompt-id='" + promptIdOrEle + "']");
+	}else{
+		pm = promptIdOrEle;
+	}
+	if (pm){
+		//const TRANSITION_MS = 0; // must match transition duration in main.css
+		pm.remove();
+		if (uiElements.promptModalOverlay.children.length == 0){
+			uiElements.promptModalOverlay.classList.remove("open");
+		}
+	}
+}
+var promptIdIndex = 0;
+
+function _convertIsoToInputDate(isoDate){
+	if (!isoDate) return "";
+    const date = new Date(isoDate);
+    //NOTE: we compensate for the local time offset
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+function _convertInputToIsoDate(inputDate){
+	if (!inputDate) return null;
+	//NOTE: "yyyy-MM-ddTHH:mm" is a valid format for new Date()
+    return new Date(inputDate).toISOString();
 }
 
 // -- Bandwidth stats -----------------------------------------

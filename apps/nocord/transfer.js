@@ -50,7 +50,16 @@ export function handleIncomingData(pid, raw) {
     case 'file-complete':
       finalizeFileReceive(pid, msg.id);
       break;
+    case 'new-host-announce':
+      //NOTE: we can add more 'new-host-..' events here if required
+      _newHostEventsHandler?.(pid, msg);
+      break;
   }
+}
+
+let _newHostEventsHandler = null;
+export function setNewHostEventsHandler(fn) {
+  _newHostEventsHandler = fn;
 }
 
 // -- Send a file ---------------------------------------------

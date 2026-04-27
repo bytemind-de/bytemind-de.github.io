@@ -87,11 +87,11 @@ export async function toggleScreenWakeLock() {
 	}
 }
 function updateWakeLockButtonState() {
-	const toggle = document.getElementById('toggle-wake-lock-btn');
+	const indicators = document.querySelectorAll('[data-state-indicator="wake-lock"]');
 	if (wakeLock){
-		toggle.classList.add("active");
+		indicators?.forEach((t) => t.classList.add("active"));
 	}else{
-		toggle.classList.remove("active");
+		indicators?.forEach((t) => t.classList.remove("active"));
 	}
 	state.screen.wakeLock = !!wakeLock;
 }

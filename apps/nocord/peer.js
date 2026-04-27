@@ -43,11 +43,22 @@ export function onSignalingChange() {
 }
 
 function buildPeerConfig() {
+  if (state.inviteEvent?.server){
+    if (state.inviteEvent.server == "default" || state.inviteEvent.server == "peerjs"){
+      return {};
+    }else{
+      return _buildPeerConfigObject(state.inviteEvent.server);
+    }
+  }
+
   const preset = document.getElementById('signaling-preset').value;
   if (preset === 'peerjs') return {};
 
   const url = document.getElementById('custom-server-url').value.trim();
   if (!url) { toast('Please enter a server URL', 'error'); return null; }
+  return _buildPeerConfigObject(url);
+}
+function _buildPeerConfigObject(url) {
   try {
     const u = new URL(url);
     return {
@@ -60,6 +71,15 @@ function buildPeerConfig() {
     toast('Invalid server URL', 'error');
     return null;
   }
+}
+export function getSignalingServer() {
+  if (state.inviteEvent?.server){
+    return state.inviteEvent.server;
+  }
+  const preset = document.getElementById('signaling-preset').value;
+  if (preset === 'peerjs') return null;
+  const customUrl = document.getElementById('custom-server-url').value.trim();
+  try { return (new URL(customUrl)).href; } catch { return null; };
 }
 
 // -- Internal: connect to signaling server -------------------

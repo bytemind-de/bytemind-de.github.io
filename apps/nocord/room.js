@@ -26,20 +26,46 @@
 // ============================================================
 
 import { state } from './state.js';
-import { toast, updateRoomPeerList, addSystemMessage,
-  checkConnectionStatus, setStatus } from './ui.js';
+import { toast, createPrompt, closePrompt,
+  updateRoomPeerList, addSystemMessage,
+  checkConnectionStatus, setStatus 
+} from './ui.js';
 import { setupDataConnection, setRoomConnectionHandler,
-  setPeerUnavailableHandler, connectToServer, connectWithId,
-  hangupAll, disconnectServer } from './peer.js';
+  setPeerUnavailableHandler, getSignalingServer,
+  connectToServer, connectWithId, hangupAll, disconnectServer
+} from './peer.js';
 
-// Register our handlers with peer.js immediately on module load --
-// this must be synchronous so it's ready before any connection opens
-setRoomConnectionHandler(handleRoomConnection);
-setPeerUnavailableHandler(handlePeerUnavailable);
+// -- Setup ---------------------------------------------------
+
+export async function setupRoomModule(){
+  // Register handlers for peer.js
+  setRoomConnectionHandler(handleRoomConnection);
+  setPeerUnavailableHandler(handlePeerUnavailable);
+
+  // Check URL parameters
+  const inviteId = state.getUrlParameter("inviteId");
+  if (inviteId){
+    let inviteEvent;
+    try {
+      inviteEvent = JSON.parse(atob(inviteId));
+    } catch(err) {
+      console.warn("Saw 'inviteId' URL parameter, but was invalid. Error:", err);
+      inviteEvent = null;
+    }
+    if (inviteEvent) showInviteEvent(inviteEvent);
+  }
+}
 
 // -- Compute room ID from name + password --------------------
 // Uses SHA-256 and takes the first 16 hex chars as peer ID prefix.
 async function computeRoomId(roomName, password) {
+  if (state.inviteEvent?.roomId){
+    return state.inviteEvent.roomId;
+  }
+  if (!roomName || roomName == "-invited-"){
+    toast('Please enter a room name to find peers', 'error');
+    return;
+  }
   const raw    = roomName.trim().toLowerCase() + ':' + password;
   const bytes  = new TextEncoder().encode(raw);
   const hash   = await crypto.subtle.digest('SHA-256', bytes);
@@ -68,19 +94,46 @@ function handlePeerUnavailable(failedId) {
   return true;
 }
 
+// -- Create/join room quick-access prompt -------------------------
+export function showRoomQuickAccessPrompt() {
+  const {roomName, password, myName} = getRoomPasswordAndUsername();
+  //const signalingServer = getSignalingServer() || 'default';
+  const pr = createPrompt({
+    targetWidth: "300px",
+    contentForm: [
+      {type: "section-header", value: "Room Setup"},
+      {type: "info-text", value: "Enter user name, room name and optionally a password to host or join a hangout."},
+      //{type: "input", name: "server", uiName: "Signaling server", value: signalingServer, disabled: true},
+      {type: "input", name: "myName", uiName: "User name", value: myName},
+      {type: "input", name: "roomName", uiName: "Room name", value: roomName},
+      {type: "password", name: "password", uiName: "Password", value: password}
+    ],
+    buttons: [
+      {name: 'Host', value: 'host', addClass: "btn-primary"},
+      {name: 'Join', value: 'join', addClass: "btn-primary"},
+      'cancel'
+    ]
+  }, async function(eventName, data){
+    if (eventName == 'cancel') return;
+    //store room data
+    setRoomPasswordAndUsername(data, true);
+    if (eventName == 'host') {
+      createRoom();
+    } else if (eventName == 'join') {
+      joinRoom();
+    }
+  });
+}
+
 // -- Create a room (host) ------------------------------------
 export async function createRoom() {
   if (state.room){
     toast("Already joined room: " + state.room.name);
     return;
   }
-  const roomName = document.getElementById('room-name').value.trim();
-  const password = document.getElementById('room-password').value;
-  const myName   = document.getElementById('room-username').value.trim() || 'User';
-
-  if (!roomName) { toast('Please enter a room name', 'error'); return; }
-
+  const {roomName, password, myName} = getRoomPasswordAndUsername();
   const roomId = await computeRoomId(roomName, password);
+  if (!roomId) return;
 
   state.room = {
     id:     roomId,
@@ -107,12 +160,7 @@ export async function joinRoom() {
     toast("Already joined room: " + state.room.name);
     return;
   }
-  const roomName = document.getElementById('room-name').value.trim();
-  const password = document.getElementById('room-password').value;
-  const myName   = document.getElementById('room-username').value.trim() || 'User';
-
-  if (!roomName) { toast('Please enter a room name', 'error'); return; }
-
+  const {roomName, password, myName} = getRoomPasswordAndUsername();
   const roomId = await computeRoomId(roomName, password);
 
   // Set up room state before any async operation
@@ -186,6 +234,79 @@ export async function joinRoom() {
   });
 }
 
+// -- Create invite URL
+export async function createInviteUrl() {
+  const {roomName, password} = getRoomPasswordAndUsername();
+  const signalingServer = getSignalingServer() || 'default';
+  const pr = createPrompt({
+    targetWidth: "300px",
+    contentForm: [
+      {type: "section-header", value: "Invite Peers"},
+      {type: "info-text", value: "Set the parameters for your invite URL."},
+      {type: "input", name: "server", uiName: "Signaling server", value: signalingServer},
+      {type: "input", name: "roomName", uiName: "Room name", value: roomName},
+      {type: "password", name: "password", uiName: "Password", value: password},
+      {type: "info-text", value: "You can add a date and time as reminder for all participants."},
+      {type: "datetime", name: "meetTime", uiName: "Hangout time", value: ''}
+    ],
+    buttons: [{name: 'Generate URL', value: 'ok', addClass: "btn-primary"}, 'cancel']
+  }, async function(eventName, data){
+    //console.log("eventName:", eventName, "data:", data);
+    if (eventName != 'ok') return;
+    const roomId = await computeRoomId(data.roomName, data.password);
+    if (!roomId) return;
+    const inviteHash = btoa(JSON.stringify({server: data.server, roomId: roomId, meetTime: data.meetTime}));
+    const inviteUrl = new URL(location.origin + location.pathname);
+    inviteUrl.searchParams.append("inviteId", inviteHash);
+    showInviteUrl(inviteUrl);
+  });
+}
+function showInviteUrl(inviteUrl) {
+  const pr = createPrompt({
+    targetWidth: "300px",
+    contentForm: [
+      {type: "section-header", value: "Invite Peers"},
+      {type: "info-text", value: "Please share this URL with your peers."},
+      {type: "input", name: "inviteUrl", uiName: "Invite URL", value: inviteUrl.href}
+    ],
+    buttons: [{name: 'Copy', value: 'ok', addClass: "btn-primary"}, 'cancel']
+  }, async function(eventName, data){
+    if (eventName != 'ok') return;
+    navigator.clipboard.writeText(data.inviteUrl)
+		  .then(() => toast('Invite URL copied!', 'success'));
+  });
+}
+function showInviteEvent(inviteEvent) {
+  const {myName} = getRoomPasswordAndUsername();
+  const pr = createPrompt({
+    targetWidth: "300px",
+    contentForm: [
+      {type: "section-header", value: "Invite"},
+      {type: "info-text", value: "Be part of the following hangout"},
+      {type: "input", name: "server", uiName: "Signaling server", value: inviteEvent.server, disabled: true},
+      {type: "input", name: "roomId", uiName: "Hangout ID", value: inviteEvent.roomId, disabled: true},
+      {type: "input", name: "myName", uiName: "Display name", value: myName},
+      {type: "datetime", name: "meetTime", uiName: "Hangout time", value: inviteEvent.meetTime, disabled: true}
+    ],
+    buttons: [
+      {name: 'Host', value: 'host', addClass: "btn-primary"},
+      {name: 'Join', value: 'join', addClass: "btn-primary"},
+      'cancel'
+    ]
+  }, async function(eventName, data){
+    if (eventName == 'cancel') return;
+    //store invite event and set some temporary states
+    state.inviteEvent = inviteEvent;
+    _setInviteRoomUI(data.myName);
+    //NOTE: is reset via 'leaveRoomButton'
+    if (eventName == 'host') {
+      createRoom();
+    } else if (eventName == 'join') {
+      joinRoom();
+    }
+  });
+}
+
 // -- Member: handle host leaving (graceful or ungraceful) ----
 // Cleans up room state but keeps mesh connections alive.
 function _onHostLeft(graceful) {
@@ -212,6 +333,13 @@ export function requestRoomRefresh() {
     state.room.hostConn.send({ type: 'room-refresh' });
   }
 }
+export function requestRoomRefreshButton() {
+  if (!state.room?.hostConn) {
+    toast("Please join a room to request a refresh", 'info');
+    return;
+  }
+  requestRoomRefresh();
+}
 
 // -- Check connections and update UI or request refresh ------
 // Only for member side -- skips UI update if stale peers detected,
@@ -231,6 +359,12 @@ function _checkAndUpdatePeers(peers) {
 }
 
 // -- Leave room ----------------------------------------------
+export function leaveRoomButton() {
+  if (state.inviteEvent && Object.keys(state.inviteEvent).length){
+    _resetInviteRoomUI();
+  }
+  leaveRoom();
+}
 export function leaveRoom() {
   if (!state.room) return;
   const stateRoom = state.room; //grab before its gone ^^
@@ -323,6 +457,10 @@ function _hostOnLeave(data) {
   const { id, name } = data;
   state.room.peers = state.room.peers.filter(p => p.id !== id);
 
+  // Close DataChannel if open -- triggers conn.on('close') -> removePeerConnection
+  const c = state.connections[id];
+  if (c?.conn?.open) c.conn.close();
+
   // Broadcast updated list
   _broadcastExcept(null, {
     type:  'room-update',
@@ -410,17 +548,20 @@ export function sendPingRequest() {
 // -- Host: remove dead peers and update UI -------------------
 // peerIds: optional Set of IDs to remove -- if omitted, removes all with closed conn
 function _hostCleanUpDeadConnections(peerIds) {
-  //TODO: what about abandonned dataChannels?
   const dead = peerIds
     ? state.room.peers.filter(p => peerIds.has(p.id))
     : state.room.peers.filter(p => !p.conn?.open);
   if (!dead.length) return;
   console.log('[Room] Removing', dead.length, 'dead peer(s):', dead.map(p => p.name));
-  dead.forEach(p => toast(p.name + ' left the room', 'info'));
+  dead.forEach(p => {
+    toast(p.name + ' left the room', 'info');
+    const c = state.connections[p.id];
+    if (c?.conn?.open) c.conn.close();
+  });
   const deadIds = new Set(dead.map(p => p.id));
   state.room.peers = state.room.peers.filter(p => !deadIds.has(p.id));
   updateRoomPeerList(state.room.peers);
-  //TODO: add peer badge clean-up
+  //TODO: scan for abandonned connections once more? (dataChannels etc.)
 }
 
 // -- Host: broadcast to all peers except one -----------------
@@ -528,6 +669,26 @@ function _connectToPeer(peer) {
 }
 
 // -- UI helpers ----------------------------------------------
+function getRoomPasswordAndUsername() {
+  const roomName = document.getElementById('room-name').value.trim();
+  const password = document.getElementById('room-password').value;
+  const myName   = document.getElementById('room-username').value.trim() || 'User';
+  return {roomName, password, myName};
+}
+function setRoomPasswordAndUsername(newData, triggerChangeEvent) {
+  const roomName = document.getElementById('room-name');
+  const roomPassword = document.getElementById('room-password');
+  const username = document.getElementById('room-username');
+  roomName.value = newData?.roomName?.trim() || "";
+  roomPassword.value = newData?.password?.trim() || "";
+  username.value = newData?.myName?.trim() || 'User';
+  if (triggerChangeEvent){
+    //this will trigger for example state storage
+    roomName.dispatchEvent(new Event('input', {bubbles: false}));
+    roomPassword.dispatchEvent(new Event('input', {bubbles: false}));
+    username.dispatchEvent(new Event('input', {bubbles: false}));
+  }
+}
 function _updateRoomUI() {
   const inRoom = !!state.room;
   const roomStatusEle = document.getElementById('room-status');
@@ -542,4 +703,22 @@ function _updateRoomUI() {
   document.getElementById('room-name').disabled       = inRoom;
   document.getElementById('room-password').disabled   = inRoom;
   document.getElementById('room-username').disabled   = inRoom;
+}
+function _setInviteRoomUI(username) {
+  //special values used if an invite is active
+  if (!state.inviteEvent._roomSettingsBackup){
+    state.inviteEvent._roomSettingsBackup = getRoomPasswordAndUsername();
+  }
+  document.getElementById('room-name').value = "-invited-";
+  document.getElementById('room-password').value = "";
+  if (username != undefined) document.getElementById('room-username').value = username;
+}
+function _resetInviteRoomUI() {
+  //TODO: restore old, if possible and remove URL param?
+  if (state.inviteEvent?._roomSettingsBackup){
+    setRoomPasswordAndUsername(state.inviteEvent._roomSettingsBackup);
+  }
+  state.inviteEvent = null;
+  document.getElementById('room-name').value = "";
+  document.getElementById('room-password').value = "";
 }

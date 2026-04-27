@@ -5,6 +5,10 @@
 // ============================================================
 
 export const state = {
+	// -- Invite overwrites ---------------------------------------
+	// {server, roomId, meetTime}
+	inviteEvent: null,
+
 	// -- Room ----------------------------------------------------
 	// { id, name, isHost, myName, peers: [{id, name, conn?}], hostConn? }
 	room: null,

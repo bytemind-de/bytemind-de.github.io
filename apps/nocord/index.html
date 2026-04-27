@@ -26,6 +26,19 @@
 	<!-- Styles -->
 	<link rel="stylesheet" href="fonts/material-icons.css">
 	<link rel="stylesheet" href="main.css">
+	<script>
+		try {
+			window.appColorScheme = window.localStorage.getItem('user-color-scheme');
+		} catch (e) {
+			console.warn("[color-scheme] Failed to load setting from local storage.");
+		}
+		if (!window.appColorScheme && window.matchMedia('(prefers-color-scheme: dark)').matches){
+			window.appColorScheme = "dark";
+		}else if (!window.appColorScheme){
+			window.appColorScheme = "light";
+		}
+		document.documentElement.classList.add(window.appColorScheme);
+	</script>
 
 	<!-- PeerJS via CDN (muss vor main.js geladen sein, kein Modul) -->
 	<script type="text/javascript" src="peer-js/peerjs-1.5.5.min.js"></script>
@@ -42,7 +55,8 @@
 <body>
 	<div id="app">
 		<!-- HEADER -->
-		<header id="header">
+		<header id="header" class="hidden-hmin">
+			<div id="header-icon"></div>
 			<div id="logo">No<span>Cord</span><span style="color:var(--text-2)">-P2P</span></div>
 			<div class="header-sapcer" style="flex: 1 1; height: 100%;"></div>
 			<div id="global-status" class="offline" onclick="checkConnectionStatus(true)">
@@ -52,14 +66,16 @@
 				<span id="toggle-header-menu-btn" class="material-icons font-header type-button active rot-transition" translate="no" onclick="toggleHeaderMenu()"
 					title="Toggle context menu">tune</span>
 			</div>
-			<div id="header-context-menu-container">
-				<div class="header-context-menu">
+			<div id="header-context-menu-container" class="inline-slide-menu-container">
+				<div id="header-context-menu" class="inline-slide-menu">
 					<span id="page-reload-btn" class="material-icons font-header-sm type-button active" translate="no" onclick="window.location.reload();"
 						title="Reload app">sync</span>
 					<span id="toggle-fullscreen-btn" class="material-icons font-header-sm type-button" translate="no" onclick="toggleFullscreen()"
-						title="Toggle full-screen">fullscreen</span>
+						title="Toggle full-screen" data-state-indicator="fullscreen">fullscreen</span>
 					<span id="toggle-wake-lock-btn" class="material-icons font-header-sm type-button" translate="no" onclick="toggleScreenWakeLock()"
-						title="Toggle screen wake-lock">phonelink_lock</span>
+						title="Toggle screen wake-lock" data-state-indicator="wake-lock">phonelink_lock</span>
+					<span id="toggle-wake-lock-btn" class="material-icons font-header-sm type-button active" translate="no" onclick="toggleLightDarkColorTheme()"
+						title="Toggle screen wake-lock">contrast</span>
 					<span id="toggle-menu-btn" class="material-icons font-header-sm type-button active" translate="no" onclick="toggleMenu()"
 						title="Toggle main menu">vertical_split</span>
 				</div>
@@ -68,9 +84,29 @@
 
 		<!-- SIDEBAR -->
 		<aside id="sidebar">
+			<!-- Header -->
+			<div id="sidebar-header" class="section-header">
+				<span class="section-title">Menu</span>
+				<span id="toggle-header-menu-sidebar-btn" class="material-icons font-section type-button rot-transition hidden-hmax" translate="no"
+						onclick="toggleHeaderMenuSidebar()" title="Toggle main menu" style="padding: 0px 2px;">tune</span>
+				<div id="sidebar-header-context-menu" class="inline-slide-menu-container">
+					<div class="inline-slide-menu">
+						<span class="material-icons font-header-sm-2 type-button active" translate="no" onclick="window.location.reload();"
+							title="Reload app">sync</span>
+						<span class="material-icons font-header-sm-2 type-button" translate="no" onclick="toggleFullscreen()"
+							title="Toggle full-screen" data-state-indicator="fullscreen">fullscreen</span>
+						<span class="material-icons font-header-sm-2 type-button" translate="no" onclick="toggleScreenWakeLock()"
+							title="Toggle screen wake-lock" data-state-indicator="wake-lock">phonelink_lock</span>
+						<span class="material-icons font-header-sm-2 type-button active" translate="no" onclick="toggleLightDarkColorTheme()"
+							title="Toggle screen wake-lock">contrast</span>
+						<span class="material-icons font-header-sm-2 type-button active" translate="no" onclick="toggleMenu()"
+							title="Toggle main menu">vertical_split</span>
+					</div>
+				</div>
+			</div>
 
 			<!-- §1 Audio -->
-			<div class="panel collapsed" id="panel-audio">
+			<div id="panel-audio" class="panel collapsed">
 				<div class="panel-header" onclick="togglePanel('panel-audio')">
 					<span class="panel-icon"><span class="material-icons font-section" translate="no">mic</span></span>
 					<span class="panel-label">Audio Settings</span>
@@ -195,7 +231,7 @@
 			</div>
 
 			<!-- §2 Verbindung + Raum -->
-			<div class="panel" id="panel-conn">
+			<div id="panel-conn" class="panel">
 				<div class="panel-header" onclick="togglePanel('panel-conn')">
 					<span class="panel-icon"><span class="material-icons font-section" translate="no">hub</span></span>
 					<span class="panel-label">Connection & Room</span>
@@ -216,8 +252,12 @@
 						<input type="url" id="custom-server-url" placeholder="ws://0.0.0.0:9000/peerjs">
 					</div>
 					<div class="field flex-group">
-						<button class="btn btn-danger btn-sm" id="btn-disconnect-server" onclick="disconnectServer()"
-							disabled>Disconnect</button>
+						<div class="btn-row" style="flex-shrink: 0;">
+							<button class="btn btn-danger btn-sm" id="btn-disconnect-server" onclick="disconnectServer()"
+								disabled>Disconnect</button>
+							<button class="btn btn-ghost btn-sm" id="btn-invite-link" onclick="createInviteUrl()">
+								<span class="material-icons font-btn" translate="no">link</span>Invite</button>
+						</div>
 						<span id="my-peer-id" onclick="copyPeerId()" title="Click to copy peer ID">-</span>
 					</div>
 					<hr style="border:0;margin:10px 0" noshade>
@@ -238,7 +278,7 @@
 							<span class="material-icons font-btn" translate="no">add</span>Create</button>
 						<button class="btn btn-ghost btn-sm" id="btn-join-room" onclick="joinRoom()">
 							<span class="material-icons font-btn" translate="no">share</span>Join</button>
-						<button class="btn btn-danger btn-sm" id="btn-leave-room" onclick="leaveRoom()" disabled>
+						<button class="btn btn-danger btn-sm" id="btn-leave-room" onclick="leaveRoomButton()" disabled>
 							<span class="material-icons font-btn" translate="no">close</span>Leave</button>
 					</div>
 					<!-- TODO: move to a better location?
@@ -247,7 +287,7 @@
 			</div>
 
 			<!-- §3 Teilnehmer -->
-			<div class="panel" id="panel-peers">
+			<div id="panel-peers" class="panel">
 				<div class="panel-header" onclick="togglePanel('panel-peers')">
 					<span class="panel-icon"><span class="material-icons font-section" translate="no">group</span></span>
 					<span class="panel-label">Peers</span>
@@ -260,13 +300,13 @@
 						</div>
 					</div>
 					<div class="field btn-row">
-						<button class="btn btn-ghost btn-sm" id="btn-refresh-peer-list" onclick="requestRoomRefresh()">Refresh</button>
+						<button class="btn btn-ghost btn-sm" id="btn-refresh-peer-list" onclick="requestRoomRefreshButton()">Refresh</button>
 					</div>
 				</div>
 			</div>
 
 			<!-- §4 Bandbreite -->
-			<div class="panel collapsed" id="panel-bw">
+			<div id="panel-bw" class="panel collapsed">
 				<div class="panel-header" onclick="togglePanel('panel-bw')">
 					<span class="panel-icon"><span class="material-icons font-section" translate="no">insert_chart</span></span>
 					<span class="panel-label">Bandwidth</span>
@@ -292,7 +332,7 @@
 			</div>
 
 			<!-- Alt. action buttons -->
-			<!--<div class="panel" id="panel-actions">
+			<!--<div id="panel-actions" class="panel">
 				<div class="panel-body">
 					<div class="field btn-row">
 						<button class="btn btn-ghost btn-sm" id="" onclick="">Test</button>
@@ -305,10 +345,10 @@
 		<!-- MAIN: Chat -->
 		<main id="main">
 			<div id="chat-area">
-				<div id="chat-header">
+				<div id="chat-header" class="section-header">
 					<span id="toggle-header-menu-btn-alt" class="material-icons font-section type-button hidden-hmax" translate="no" onclick="toggleMenu()"
 						title="Toggle main menu" style="padding: 0px 2px;">vertical_split</span>
-					<span id="chat-title">Chat</span>
+					<span id="chat-title" class="section-title">Chat</span>
 					<div id="connected-peers-badges"></div>
 					<span class="material-icons font-section type-button" translate="no" onclick="filterChatMessages()"
 						title="Filter chat messages" style="padding: 0px 2px;">filter_list</span>
@@ -318,8 +358,9 @@
 				<div id="chat-messages">
 					<div id="empty-chat">
 						<div class="big">NoCord</div>
-						<span><u onclick="createRoom()" style="cursor: pointer;">Create</u> a room or 
-							<u onclick="joinRoom()" style="cursor: pointer;">join</u> one to get started</span>
+						<p>-Peer-to-Peer Communication-</p>
+						<span><u onclick="showRoomQuickAccessPrompt()" style="cursor: pointer;">
+							Create a room or join</u> one to get started</span>
 					</div>
 				</div>
 
@@ -355,6 +396,11 @@
 	<!-- Lightbox -->
 	<div id="modal-overlay">
 		<img id="modal-img" src="" alt="">
+	</div>
+
+	<!-- Alert/prompt modal -->
+	<div id="prompt-overlay">
+		<!-- dynamically created 'prompt-modal' elements -->
 	</div>
 
 </body>
