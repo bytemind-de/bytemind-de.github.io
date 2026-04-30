@@ -5,6 +5,7 @@
 // ============================================================
 
 export const state = {
+	appVersion: "0.9.0",
 	// -- Invite overwrites ---------------------------------------
 	// {server, roomId, meetTime}
 	inviteEvent: null,
@@ -66,6 +67,7 @@ state.getUrlParameter = function(name) {
 
 state.getAppStatusOverview = function() {
 	const status = {
+		appVersion: state.appVersion,
 		signaling: {
 			connected: !!state.peer && !state.peer.destroyed && !state.peer.disconnected,
 			myId: state.myId || null,

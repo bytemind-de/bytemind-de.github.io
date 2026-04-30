@@ -32,7 +32,8 @@ import { toast, createPrompt, closePrompt,
 } from './ui.js';
 import { setupDataConnection, setRoomConnectionHandler,
   setPeerUnavailableHandler, getSignalingServer,
-  connectToServer, connectWithId, hangupAll, disconnectServer
+  connectToServer, connectWithId, hangupAll, disconnectServer,
+  callPeer
 } from './peer.js';
 
 // -- Setup ---------------------------------------------------
@@ -77,6 +78,11 @@ async function computeRoomId(roomName, password) {
 // -- Handle peer-unavailable errors from peer.js -------------
 // Returns true if the error was a failed room join (takes ownership).
 function handlePeerUnavailable(failedId) {
+  // Silent during host migration -- new host may not be ready yet
+  if (state._waitingForNewHost && failedId === state._waitingForNewHost.roomId) {
+    console.log('[Room] peer-unavailable during migration, ignoring:', failedId.slice(0, 8));
+    return true;
+  }
   if (!state.room || state.room.isHost) return false;
   if (failedId !== state.room.id) return false;
 
@@ -162,6 +168,7 @@ export async function joinRoom() {
   }
   const {roomName, password, myName} = getRoomPasswordAndUsername();
   const roomId = await computeRoomId(roomName, password);
+  if (!roomId) return;
 
   // Set up room state before any async operation
   state.room = {
@@ -309,8 +316,18 @@ function showInviteEvent(inviteEvent) {
 
 // -- Member: handle host leaving (graceful or ungraceful) ----
 // Cleans up room state but keeps mesh connections alive.
-function _onHostLeft(graceful) {
+function _onHostLeft(graceful, providedNewHostId) {
   if (!state.room) return;
+
+  // Save peers and room info before clearing state
+  const savedPeers = state.room.peers.slice();
+  const savedRoomId = state.room.id;
+  const savedMyName = state.room.myName;
+
+  // Determine new host -- use provided ID or calculate locally
+  const allIds = [state.myId, ...savedPeers.map(p => p.id)];
+  const newHostId = providedNewHostId || allIds.sort()[0];
+
   state.room.hostConn = null;  // null before any close to prevent re-entry
   state.room = null;
   updateRoomPeerList([]);
@@ -318,6 +335,149 @@ function _onHostLeft(graceful) {
   let msg = graceful ? 'Host left the room' : 'Disconnected from host';
   addSystemMessage(msg);
   toast(msg, graceful ? 'info' : 'error');
+
+  if (newHostId === state.myId) {
+    // We are the new host candidate
+    addSystemMessage('Taking over as new host...');
+    _becomeHost(savedRoomId, savedPeers, savedMyName);
+  } else {
+    // Wait for new host to register and connect
+    state._waitingForNewHost = {
+      hostCandidate: newHostId,
+      roomId:        savedRoomId,
+      myName:        savedMyName,
+      since:         Date.now(),
+    };
+    console.log('[Room] Waiting for new host:', newHostId.slice(0, 8));
+    addSystemMessage('Waiting for new host...');
+
+    // Start retry loop immediately
+    const tryRejoin = () => {
+      if (state.room) return; // already rejoined
+      if (!state._waitingForNewHost) return; // cancelled
+      if (Date.now() - state._waitingForNewHost.since > NEW_HOST_WAIT_MS) {
+        toast('Host migration failed – please rejoin manually', 'error');
+        state._waitingForNewHost = null;
+        return;
+      }
+      console.log('[Room] Attempting rejoin...');
+      _rejoinRoom(savedRoomId, savedMyName);
+      setTimeout(tryRejoin, NEW_HOST_RETRY_INTERVAL_MS);
+    };
+    setTimeout(tryRejoin, NEW_HOST_RETRY_INTERVAL_MS);
+  }
+}
+
+// -- Host migration: take over --------------------------------
+const NEW_HOST_WAIT_MS = 15000;
+const NEW_HOST_RETRY_INTERVAL_MS = 4000;
+
+async function _becomeHost(roomId, savedPeers, myName) {
+  const reconnectTo = savedPeers.map(p => ({
+    id:         p.id,
+    name:       p.name,
+    mediaTypes: ['data',
+      ...(state.connections[p.id]?.call ? ['audio'] : [])],
+  }));
+
+  // Leave cleanly -- hangupAll closes all connections
+  hangupAll(true);
+
+  // Register with signaling server using the room ID
+  try {
+    await connectWithId(roomId);
+  } catch (err) {
+    toast('Failed to become host: ' + (err?.type || err?.message || err), 'error');
+    return;
+  }
+
+  // Set up room state as host
+  state.room = {
+    id:     roomId,
+    name:   document.getElementById('room-name')?.value.trim() || roomId,
+    isHost: true,
+    myName: myName || document.getElementById('room-username')?.value.trim() || 'User',
+    peers:  [],
+  };
+  _updateRoomUI();
+  toast('You are now the room host', 'success');
+  addSystemMessage('Host migration complete');
+
+  // Restore connections to all known peers
+  await _restoreAllConnections(reconnectTo);
+}
+
+async function _restoreAllConnections(reconnectTo) {
+  for (const peer of reconnectTo) {
+    if (peer.id === state.myId) continue;
+    console.log('[Room] Restoring connection to', peer.name, peer.id.slice(0, 8));
+    // Connect directly -- bypass lower-ID check since we are the new host
+    if (!state.connections[peer.id]?.conn?.open && !state.pendingConnections.has(peer.id)) {
+      if (!state.connections[peer.id]) state.connections[peer.id] = {};
+      const conn = state.peer.connect(peer.id, {
+        reliable:      true,
+        serialization: 'binary',
+        label:         'data',
+      });
+      const connTimeout = setTimeout(() => {
+        if (!conn.open) state.pendingConnections.delete(peer.id);
+      }, 15000);
+      state.pendingConnections.set(peer.id, { conn, connTimeout });
+      conn.on('open', () => { clearTimeout(connTimeout); state.pendingConnections.delete(peer.id); });
+      conn.on('error', () => { clearTimeout(connTimeout); state.pendingConnections.delete(peer.id); });
+      setupDataConnection(conn);
+    }
+    // Audio call if needed
+    if (peer.mediaTypes?.includes('audio')) {
+      await callPeer(peer.id);
+    }
+  }
+}
+
+// -- Member: rejoin room with new host -----------------------
+async function _rejoinRoom(roomId, myName) {
+  if (state.room) return; // already in a room
+
+  const conn = state.peer.connect(roomId, {
+    reliable:      true,
+    serialization: 'json',
+    label:         'room',
+    metadata:      { name: myName },
+  });
+  const connTimeout = setTimeout(() => {
+    if (!conn.open) {
+      state.pendingConnections.delete(roomId);
+    }
+  }, 5000);
+  state.pendingConnections.set(roomId, { conn, connTimeout });
+
+  conn.on('open', () => {
+    clearTimeout(connTimeout);
+    state.pendingConnections.delete(roomId);
+    // Set up room state
+    state.room = {
+      id:       roomId,
+      name:     document.getElementById('room-name')?.value.trim() || roomId,
+      isHost:   false,
+      myName,
+      peers:    [],
+      hostConn: conn,
+    };
+    state._waitingForNewHost = null;
+    conn.send({ type: 'room-join', id: state.myId, name: myName });
+    addSystemMessage('Rejoined room with new host');
+    setStatus('online', 'Peer');
+    _updateRoomUI();
+  });
+  conn.on('data', data => _handleRoomMessage(data));
+  conn.on('close', () => {
+    if (state.room?.hostConn === conn) _onHostLeft(false);
+  });
+  conn.on('error', () => {
+    clearTimeout(connTimeout);
+    state.pendingConnections.delete(roomId);
+    // Will retry via _waitingForNewHost timer
+  });
 }
 
 // -- Request peer list refresh from host ---------------------
@@ -334,7 +494,7 @@ export function requestRoomRefresh() {
   }
 }
 export function requestRoomRefreshButton() {
-  if (!state.room?.hostConn) {
+  if (!state.room?.hostConn && !state.room?.isHost) {
     toast("Please join a room to request a refresh", 'info');
     return;
   }
@@ -370,8 +530,10 @@ export function leaveRoom() {
   const stateRoom = state.room; //grab before its gone ^^
 
   if (stateRoom.isHost) {
-    // Notify all members that host is leaving
-    _broadcastExcept(null, { type: 'room-host-leave' });
+    // Determine new host -- lowest peer ID among members
+    const newHostId = stateRoom.peers.map(p => p.id).sort()[0] || null;
+    // Notify all members that host is leaving and who takes over
+    _broadcastExcept(null, { type: 'room-host-leave', newHostId });
     disconnectServer();
   } else {
     // Notify host
@@ -461,10 +623,13 @@ function _hostOnLeave(data) {
   const c = state.connections[id];
   if (c?.conn?.open) c.conn.close();
 
-  // Broadcast updated list
+  // Broadcast updated list -- include host itself
   _broadcastExcept(null, {
     type:  'room-update',
-    peers: state.room.peers.map(p => ({ id: p.id, name: p.name })),
+    peers: [
+      { id: state.myId, name: state.room.myName },
+      ...state.room.peers.map(p => ({ id: p.id, name: p.name })),
+    ],
   });
 
   updateRoomPeerList(state.room.peers);
@@ -612,7 +777,7 @@ function _handleRoomMessage(data) {
       break;
 
     case 'room-host-leave':
-      _onHostLeft(true);
+      _onHostLeft(true, data.newHostId);
       break;
 
     case 'room-ping':
@@ -707,6 +872,7 @@ function _updateRoomUI() {
 function _setInviteRoomUI(username) {
   //special values used if an invite is active
   if (!state.inviteEvent._roomSettingsBackup){
+    //store pre-invite backup
     state.inviteEvent._roomSettingsBackup = getRoomPasswordAndUsername();
   }
   document.getElementById('room-name').value = "-invited-";
@@ -714,8 +880,9 @@ function _setInviteRoomUI(username) {
   if (username != undefined) document.getElementById('room-username').value = username;
 }
 function _resetInviteRoomUI() {
-  //TODO: restore old, if possible and remove URL param?
+  //TODO: remove URL param?
   if (state.inviteEvent?._roomSettingsBackup){
+    //restore pre-invite backup
     setRoomPasswordAndUsername(state.inviteEvent._roomSettingsBackup);
   }
   state.inviteEvent = null;

@@ -287,7 +287,7 @@ function makeConnectedBadge(pid) {
 	sp.innerHTML = "● " + (peer.name || (peer.id.slice(0, 6) + "..."));
 	var kbpsInd = document.createElement("span");
 	kbpsInd.textContent = '';
-	//TODO: use different badge colors properly (badge-green, badge-red, badge-amber, badge-blue)
+	//TODO: use different badge colors properly (badge-green, badge-red, badge-amber)
 	if (peer.name){
 		peer._showPeerBadgeAudioKbps = function (kbpsVal) {
 			kbpsInd.textContent = (!mainMenuIsOpen && kbpsVal !== undefined)? ('(' + kbpsVal.toFixed(1) + ' kb/s)') : '';
