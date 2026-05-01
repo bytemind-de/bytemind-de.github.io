@@ -390,6 +390,8 @@ export function setupDataConnection(conn) {
     toast('Data channel error: ' + err.message, 'error');
   });
   conn.on('close', () => {
+    //NOTE: it seems this can trigger multiple times for the same ID
+    if (!state.connections[pid]?.conn) return;  //already cleaned up
     let roomPeer = state.room?.peers.find(p => p.id == pid);
     let name = roomPeer?.name?
       (roomPeer.name + " (" + pid.slice(0, 6) + "..)") : pid.slice(0, 8) + "..";

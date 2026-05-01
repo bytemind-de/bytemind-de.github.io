@@ -167,9 +167,17 @@ export function updateRoomPeerList(peers) {
 	if (!peers) peers = state.room?.peers || [];
 	//make sure we have no abandoned connections 
 	Object.keys(state.connections).forEach((pid) => {
-		if (!state.room?.peers?.length || !state.room.peers.find(p => p.id == pid)){
-			//const c = state.connections[pid];
-			console.warn("Peer ID:", pid, "has no room!");	//TODO: improve handling
+		if (!peers.length || !peers.find(p => p.id == pid)){
+			const c = state.connections[pid];
+			if (c.conn?.open === true){
+				if (!c._scheduledForClose){
+					console.warn("Peer ID:", pid, "has no room!");
+				}else if (c._scheduledForClose > (Date.now() + 5000)){
+					console.warn("Peer ID:", pid,
+						"has no room AND was scheduled for close, but is still here!");
+				}
+			}
+			//TODO: improve handling?
 		}
 	});
 	//get list and update entries

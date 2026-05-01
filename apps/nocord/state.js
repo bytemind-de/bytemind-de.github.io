@@ -5,7 +5,7 @@
 // ============================================================
 
 export const state = {
-	appVersion: "0.9.0",
+	appVersion: "0.9.1",
 	// -- Invite overwrites ---------------------------------------
 	// {server, roomId, meetTime}
 	inviteEvent: null,
