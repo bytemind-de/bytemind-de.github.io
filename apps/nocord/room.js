@@ -429,7 +429,7 @@ async function _becomeHost(roomId, savedPeers) {
   const {roomName, myName} = getRoomPasswordAndUsername();
   state.room = {
     id:     roomId,
-    name:   roomName,
+    name:   roomName || roomId,
     isHost: true,
     myName: myName || 'User',
     peers:  [],
@@ -447,24 +447,7 @@ async function _restoreAllConnections(reconnectTo) {
   for (const peer of reconnectTo) {
     if (peer.id === state.myId) continue;
     console.log('[Room] Restoring connection to', peer.name, peer.id.slice(0, 8));
-    // Connect directly -- bypass lower-ID check since we are the new host
-    if (!state.connections[peer.id]?.conn?.open && !state.pendingConnections.has(peer.id)) {
-      if (!state.connections[peer.id]) state.connections[peer.id] = {};
-      //TODO: replace with '_connectToPeer'?
-      const conn = state.peer.connect(peer.id, {
-        reliable:      true,
-        serialization: 'binary',
-        label:         'data',
-      });
-      const connTimeout = setTimeout(() => {
-        if (!conn.open) state.pendingConnections.delete(peer.id);
-      }, 15000);
-      state.pendingConnections.set(peer.id, { conn, connTimeout });
-      conn.on('open', () => { clearTimeout(connTimeout); state.pendingConnections.delete(peer.id); });
-      conn.on('error', () => { clearTimeout(connTimeout); state.pendingConnections.delete(peer.id); });
-      setupDataConnection(conn);
-    }
-    // Audio call if needed
+    _connectToPeer(peer, true);  // force=true bypasses lower-ID check
     if (peer.mediaTypes?.includes('audio')) {
       await callPeer(peer.id);
     }
@@ -781,7 +764,7 @@ function _handleRoomMessage(data) {
 }
 
 // -- Connect DataChannel to a peer (mesh) --------------------
-function _connectToPeer(peer) {
+function _connectToPeer(peer, force = false) {
   if (peer.id === state.myId) return;          // don't connect to self
 
   const existing = state.connections[peer.id];
@@ -791,7 +774,7 @@ function _connectToPeer(peer) {
 
   // Mark as connecting to prevent duplicate attempts from both sides
   // Use the lower peer ID to decide who initiates -- only one side connects
-  if (state.myId > peer.id) {
+  if (!force && state.myId > peer.id) {
     console.log('[Room] Skipping connect to', peer.id.slice(0,8), '-- they will initiate');
     return;
   }
